@@ -1,0 +1,12 @@
+# Machine-specific overrides (secrets, tokens, proxy settings)
+local.sh
+
+# IDE / Editor
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+

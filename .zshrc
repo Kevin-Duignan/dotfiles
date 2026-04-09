@@ -103,24 +103,16 @@ plugins=(
     command-not-found
     copyfile
     copypath
-    dircycle
-    docker-compose
-    extract
     eza
     fzf
-    gh
     git
     gitignore
     git-auto-fetch
     history
-    jira
     man
-    npm
     octozen
     pip
     python
-    redis-cli
-    universalarchive
     vi-mode
     you-should-use
     zoxide
