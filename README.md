@@ -632,7 +632,7 @@ MSYS2 is also **not** auto-detected. Add it manually to `settings.json`:
 ```json
 {
     "name": "MSYS2 (Zsh)",
-    "commandline": "C:/msys64/msys2_shell.cmd -defterm -here -no-start -ucrt64 -shell zsh",
+    "commandline": "C:/msys64/msys2_shell.cmd -defterm -here -no-start -ucrt64 -shell zsh -use-full-path",
     "icon": "C:/msys64/msys2.ico",
     "startingDirectory": "~",
     "fontFace": "MesloLGS NF",
@@ -648,6 +648,7 @@ MSYS2 is also **not** auto-detected. Add it manually to `settings.json`:
 > - `-no-start` — don't open a new window (stay inside Windows Terminal)
 > - `-ucrt64` — use the UCRT64 environment (modern, recommended)
 > - `-shell zsh` — launch Zsh directly
+> - `-use-full-path` - allow visibility of plugins installed via `winget`
 
 > If you installed MSYS2 via `winget`, the default path is `C:\msys64`. Adjust if different.
 
