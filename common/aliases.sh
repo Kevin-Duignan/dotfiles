@@ -63,16 +63,19 @@ alias zshals='vim ${DOTFILES_DIR:-$HOME/.dotfiles}/common/aliases.sh'
 alias zshfunc='vim ${DOTFILES_DIR:-$HOME/.dotfiles}/common/functions.sh'
 alias bashrc='vim ~/.bashrc'
 alias vimrc='vim ~/.vimrc'
+alias p10k-cfg='vim ${DOTFILES_DIR:-$HOME/.dotfiles}/.p10k.zsh'
 alias dotfiles='cd ${DOTFILES_DIR:-$HOME/.dotfiles} && git pull'
 alias dotsync='git -C ${DOTFILES_DIR:-$HOME/.dotfiles} pull && \
-  ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.zshrc  ~/.zshrc && \
-  ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.vimrc  ~/.vimrc && \
-  ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.bashrc ~/.bashrc && \
+  ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.zshrc    ~/.zshrc && \
+  ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.p10k.zsh ~/.p10k.zsh && \
+  ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.vimrc    ~/.vimrc && \
+  ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.bashrc   ~/.bashrc && \
   echo "✅ Dotfiles synced (symlinked)." && source ~/.zshrc'
 alias dotsync-cp='git -C ${DOTFILES_DIR:-$HOME/.dotfiles} pull && \
-  cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.zshrc  ~/.zshrc && \
-  cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.vimrc  ~/.vimrc && \
-  cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.bashrc ~/.bashrc && \
+  cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.zshrc    ~/.zshrc && \
+  cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.p10k.zsh ~/.p10k.zsh && \
+  cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.vimrc    ~/.vimrc && \
+  cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.bashrc   ~/.bashrc && \
   echo "✅ Dotfiles synced (copied)." && source ~/.zshrc'
 
 # ============================================
