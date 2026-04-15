@@ -165,7 +165,6 @@ ZSH_THEME="powerlevel10k/powerlevel10k"
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(
     # --- Active ---
-    colored-man-pages
     vi-mode
     you-should-use
     zsh-autosuggestions
@@ -175,21 +174,15 @@ plugins=(
     # aliases          # → common/aliases.sh covers all aliases
     # brew             # → os/macos.sh sets up Homebrew FPATH directly
     # celery           # → niche; enable if actively using celery CLI
+    # colored-man-pages # → appearance only
     # command-not-found # → slow (queries package DB on every miss)
     # copyfile         # → trivial one-liner, rarely used
     # copypath         # → trivial one-liner, rarely used
-    # eza              # → common/aliases.sh already configures eza aliases
-    # fzf              # → source <(fzf --zsh) is called directly below
     # git              # → common/aliases.sh defines all git shortcuts
-    # gitignore        # → niche (gi command to fetch templates)
-    # git-auto-fetch   # → runs git fetch on every prompt; adds latency
-    # history          # → just a few aliases already covered by 'h' alias
-    # man              # → redundant with colored-man-pages
     # octozen          # → novelty / motivational quotes
     # pip              # → slow completion init, rarely needed interactively
     # python           # → just a few aliases
     # zoxide           # → eval "$(zoxide init zsh)" is called directly below
-    # zsh-bat          # → common/aliases.sh already aliases cat='bat'
 )
 
 source $ZSH/oh-my-zsh.sh

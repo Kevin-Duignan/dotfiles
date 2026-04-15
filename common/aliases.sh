@@ -75,6 +75,182 @@ alias dotsync-cp='git -C ${DOTFILES_DIR:-$HOME/.dotfiles} pull && \
   cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.bashrc ~/.bashrc && \
   echo "✅ Dotfiles synced (copied)." && source ~/.zshrc'
 
+# ============================================
+# Git Aliases (most-used from OMZ git plugin)
+# ============================================
+alias g='git'
+alias ga='git add'
+alias gaa='git add --all'
+alias gau='git add --update'
+alias gap='git add --patch'
+
+alias gb='git branch'
+alias gba='git branch --all'
+alias gbd='git branch --delete'
+alias gbD='git branch --delete --force'
+alias gbr='git branch --remote'
+
+alias gc='git commit --verbose'
+alias gca='git commit --verbose --all'
+alias 'gc!'='git commit --verbose --amend'
+alias gcam='git commit --all --message'
+alias gcmsg='git commit --message'
+alias gcn='git commit --verbose --no-edit'
+
+alias gco='git checkout'
+alias gcb='git checkout -b'
+alias gcm='git checkout $(git_main_branch)'
+
+alias gsw='git switch'
+alias gswc='git switch --create'
+alias gswm='git switch $(git_main_branch)'
+
+alias gd='git diff'
+alias gds='git diff --staged'
+alias gdca='git diff --cached'
+alias gdw='git diff --word-diff'
+
+alias gf='git fetch'
+alias gfa='git fetch --all --tags --prune'
+alias gfo='git fetch origin'
+
+alias gl='git pull'
+alias gpr='git pull --rebase'
+alias gpra='git pull --rebase --autostash'
+alias gprom='git pull --rebase origin $(git_main_branch)'
+
+alias gp='git push'
+alias gpf='git push --force-with-lease'
+alias gpsup='git push --set-upstream origin $(git_current_branch)'
+alias gpv='git push --verbose'
+alias gpod='git push origin --delete'
+
+alias glog='git log --oneline --decorate --graph'
+alias gloga='git log --oneline --decorate --graph --all'
+alias glo='git log --oneline --decorate'
+alias glol='git log --graph --pretty="%Cred%h%Creset -%C(auto)%d%Creset %s %Cgreen(%ar) %C(bold blue)<%an>%Creset"'
+alias glola='git log --graph --pretty="%Cred%h%Creset -%C(auto)%d%Creset %s %Cgreen(%ar) %C(bold blue)<%an>%Creset" --all'
+alias glg='git log --stat'
+
+alias gm='git merge'
+alias gma='git merge --abort'
+alias gmc='git merge --continue'
+alias gms='git merge --squash'
+
+alias grb='git rebase'
+alias grba='git rebase --abort'
+alias grbc='git rebase --continue'
+alias grbi='git rebase --interactive'
+alias grbs='git rebase --skip'
+alias grbm='git rebase $(git_main_branch)'
+alias grbom='git rebase origin/$(git_main_branch)'
+
+alias grh='git reset'
+alias grhh='git reset --hard'
+alias grhs='git reset --soft'
+
+alias grs='git restore'
+alias grst='git restore --staged'
+
+alias gr='git remote'
+alias grv='git remote --verbose'
+alias gra='git remote add'
+
+alias grm='git rm'
+alias grmc='git rm --cached'
+
+alias gst='git status'
+alias gss='git status --short'
+alias gsb='git status --short --branch'
+
+alias gsta='git stash push'
+alias gstaa='git stash apply'
+alias gstp='git stash pop'
+alias gstl='git stash list'
+alias gstd='git stash drop'
+alias gstc='git stash clear'
+
+alias gsh='git show'
+alias gbl='git blame -w'
+alias gcp='git cherry-pick'
+alias gcpa='git cherry-pick --abort'
+alias gcpc='git cherry-pick --continue'
+
+alias grt='cd "$(git rev-parse --show-toplevel || echo .)"'
+alias gcount='git shortlog --summary --numbered'
+alias gclean='git clean --interactive -d'
+alias gcl='git clone --recurse-submodules'
+alias gta='git tag --annotate'
+alias gtv='git tag | sort -V'
+alias grf='git reflog'
+
+# ============================================
+# Homebrew Aliases (from OMZ brew plugin)
+# ============================================
+if _has_cmd brew; then
+    alias ba='brew autoremove'
+    alias bcfg='brew config'
+    alias bci='brew info --cask'
+    alias bcin='brew install --cask'
+    alias bcl='brew list --cask'
+    alias bcn='brew cleanup'
+    alias bco='brew outdated --cask'
+    alias bcrin='brew reinstall --cask'
+    alias bcubc='brew upgrade --cask && brew cleanup'
+    alias bcubo='brew update && brew outdated --cask'
+    alias bcup='brew upgrade --cask'
+    alias bdr='brew doctor'
+    alias bfu='brew upgrade --formula'
+    alias bi='brew install'
+    alias bih='brew install --HEAD'
+    alias bl='brew list'
+    alias bo='brew outdated'
+    alias br='brew reinstall'
+    alias brewp='brew pin'
+    alias brewsp='brew list --pinned'
+    alias brh='brew reinstall --HEAD'
+    alias bs='brew search'
+    alias bsl='brew services list'
+    alias bsoff='brew services stop'
+    alias bson='brew services start'
+    alias bsr='brew services run'
+    alias bu='brew update'
+    alias bubo='brew update && brew outdated'
+    alias bubu='bubo && bup'
+    alias bugbc='brew upgrade --greedy && brew cleanup'
+    alias bup='brew upgrade'
+    alias buz='brew uninstall --zap'
+fi
+
+# ============================================
+# History Aliases (from OMZ history plugin)
+# ============================================
+alias hs='history | grep'
+alias hsi='history | grep -i'
+
+# ============================================
+# Pip Aliases (from OMZ pip plugin)
+# ============================================
+if _has_cmd pip || _has_cmd pip3; then
+    alias pipi='pip install'
+    alias pipu='pip install --upgrade'
+    alias pipun='pip uninstall'
+    alias pipgi='pip freeze | grep'
+    alias piplo='pip list -o'
+    alias pipreq='pip freeze > requirements.txt'
+    alias pipir='pip install -r requirements.txt'
+fi
+
+# ============================================
+# Python Aliases (from OMZ python plugin)
+# ============================================
+if _has_cmd python3; then
+    alias py='python3'
+    alias pyfind='find . -name "*.py"'
+    alias pygrep='grep -nr --include="*.py"'
+    alias pyserver='python3 -m http.server'
+fi
+
 
 if _has_cmd gh; then
     alias ghpr='gh pr create -B $(git_main_branch) --fill-first -e --template=pull_request_template.md'
