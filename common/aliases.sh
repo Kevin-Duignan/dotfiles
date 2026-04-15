@@ -5,6 +5,17 @@
 # ============================================
 
 # ============================================
+# Fast tool detection helper
+# Uses Zsh's built-in $commands hash (instant, no fork)
+# when available; falls back to command -v for POSIX shells.
+# ============================================
+if [ -n "$ZSH_VERSION" ]; then
+    _has_cmd() { (( ${+commands[$1]} )); }
+else
+    _has_cmd() { command -v "$1" >/dev/null 2>&1; }
+fi
+
+# ============================================
 # Safer File Operations
 # ============================================
 alias mkdir='mkdir -pv'
@@ -15,12 +26,12 @@ alias mv='mv -i'
 # ============================================
 # ls Aliases (use eza/exa if available, else fallback)
 # ============================================
-if command -v eza >/dev/null 2>&1; then
+if _has_cmd eza; then
     alias ls='eza --icons --group-directories-first'
     alias ll='eza -alh --icons --group-directories-first'
     alias la='eza -a --icons --group-directories-first'
     alias lt='eza --tree --level=2 --icons'
-elif command -v exa >/dev/null 2>&1; then
+elif _has_cmd exa; then
     alias ls='exa --icons --group-directories-first'
     alias ll='exa -alh --icons --group-directories-first'
     alias la='exa -a --icons --group-directories-first'
@@ -47,30 +58,8 @@ alias h='history'
 alias j='jobs -l'
 alias path='echo -e ${PATH//:/\\n}'
 
-# ============================================
-# Git Shortcuts
-# ============================================
-alias g='git'
-alias gs='git status'
-alias ga='git add'
-alias gaa='git add --all'
-alias gc='git commit'
-alias gcm='git commit -m'
-alias gco='git checkout'
-alias gcb='git checkout -b'
-alias gp='git push'
-alias gpl='git pull'
-alias gl='git log --oneline --graph --decorate -20'
-alias gla='git log --oneline --graph --decorate --all'
-alias gd='git diff'
-alias gds='git diff --staged'
-alias gb='git branch'
-alias gba='git branch -a'
-alias gst='git stash'
-alias gstp='git stash pop'
-alias gf='git fetch --all --prune'
 
-if command -v gh >/dev/null 2>&1; then
+if _has_cmd gh; then
     alias ghpr='gh pr create -B $(git_main_branch) --fill-first -e --template=pull_request_template.md'
 fi
 
@@ -87,14 +76,14 @@ alias mga='make generate-apis'
 # Python / Virtual Environments
 # ============================================
 alias so-venv='source .venv/bin/activate'
-if command -v ipython >/dev/null 2>&1; then
+if _has_cmd ipython; then
     alias ipy='ipython'
 fi
 
 # ============================================
 # uv — fast Python package manager (guarded)
 # ============================================
-if command -v uv >/dev/null 2>&1; then
+if _has_cmd uv; then
     alias uvs='uv sync'
     alias uva='uv add'
     alias uvr='uv remove'
@@ -110,27 +99,27 @@ fi
 # ============================================
 # Misc Tools (guarded)
 # ============================================
-if command -v bat >/dev/null 2>&1; then
+if _has_cmd bat; then
     alias cat='bat --paging=never'
 fi
 
-if command -v zoxide >/dev/null 2>&1; then
+if _has_cmd zoxide; then
     alias cd='z'
 fi
 
-if command -v yt-dlp >/dev/null 2>&1; then
+if _has_cmd yt-dlp; then
     alias ydload='yt-dlp -U && cd "$HOME/Downloads" && yt-dlp --concurrent-fragments 4 -q --no-check-certificates -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best" --merge-output-format mp4 --write-auto-sub --sub-lang en'
 fi
 
 # ============================================
 # Commit Helper (commitwell.sh)
 # ============================================
-alias commit='zsh "${DOTFILES_DIR:-$HOME/.dotfiles}/common/commitwell.sh"'
+alias commitwell='zsh "${DOTFILES_DIR:-$HOME/.dotfiles}/common/commitwell.sh"'
 
 # ============================================
 # Docker Shortcuts (guarded)
 # ============================================
-if command -v docker >/dev/null 2>&1; then
+if _has_cmd docker; then
     alias dps='docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}"'
     alias dpa='docker ps -a --format "table {{.ID}}\t{{.Names}}\t{{.Status}}"'
     alias dcu='docker compose up -d'
