@@ -170,7 +170,6 @@ source <(fzf --zsh)
 
 export FPATH="~/.eza/completions/zsh:$FPATH"
 export PATH="~/.local/bin/:$PATH"
-eval "$(op completion zsh)"; compdef _op op
 eval "$(zoxide init zsh)"
 
 # ============================================

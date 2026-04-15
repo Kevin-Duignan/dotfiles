@@ -411,13 +411,13 @@ winget install sxyazi.yazi
 
 > `winget` installs to Windows-wide paths that are visible inside MSYS2. If a tool isn't found after install, restart your MSYS2 terminal.
 
-**Set Zsh as your default shell** — edit your MSYS2 shortcut or `/etc/nsswitch.conf`, or add to the top of `~/.bashrc`:
+**Set Zsh as your default shell** — launch MSYS2 with Zsh directly via the shell command:
 
-```bash
-if [ -t 1 ]; then
-  exec zsh
-fi
 ```
+C:/msys64/msys2_shell.cmd -defterm -here -no-start -ucrt64 -shell zsh -use-full-path
+```
+
+> Use this as the command line in your Windows Terminal profile (see [Profile: MSYS2](#profile-msys2) below). The `-shell zsh` flag starts Zsh directly — no `.bashrc` hack needed. The `-use-full-path` flag inherits your Windows PATH so tools installed via `winget` are visible inside MSYS2.
 
 **Clone the repo:**
 
@@ -468,15 +468,29 @@ curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
 mkdir -p ~/.vim/{backup,swap,undo}
 ```
 
-**Symlink the config files:**
+**Link the config files** — MSYS2 symlinks don't work reliably on NTFS, so use Windows junctions (via `cmd`) or copy the files instead:
 
 ```bash
+# Back up existing files
 [ -f ~/.zshrc ] && mv ~/.zshrc ~/.zshrc.bak
 [ -f ~/.vimrc ] && mv ~/.vimrc ~/.vimrc.bak
 
-ln -sf ~/.dotfiles/.zshrc ~/.zshrc
-ln -sf ~/.dotfiles/.vimrc ~/.vimrc
+# Create junctions (Windows-native directory links that MSYS2 can follow)
+WINHOME=$(cygpath -w "$HOME")
+cmd //C mklink /J "${WINHOME}\\.zshrc" "$(cygpath -w ~/.dotfiles/.zshrc)"
+cmd //C mklink /J "${WINHOME}\\.vimrc" "$(cygpath -w ~/.dotfiles/.vimrc)"
 ```
+
+> **Note:** `mklink /J` creates NTFS junctions which work transparently in both Windows and MSYS2. If junctions fail (e.g. the target is a file, not a directory), fall back to hard links or copies:
+> ```bash
+> # Hard links (files only, same drive)
+> cmd //C mklink /H "${WINHOME}\\.zshrc" "$(cygpath -w ~/.dotfiles/.zshrc)"
+> cmd //C mklink /H "${WINHOME}\\.vimrc" "$(cygpath -w ~/.dotfiles/.vimrc)"
+>
+> # Or just copy (simplest — re-copy after git pull)
+> cp ~/.dotfiles/.zshrc ~/.zshrc
+> cp ~/.dotfiles/.vimrc ~/.vimrc
+> ```
 
 **Install Vim plugins:**
 
@@ -629,7 +643,7 @@ MSYS2 is also **not** auto-detected. Add it manually to `settings.json`:
 ```json
 {
     "name": "MSYS2 (Zsh)",
-    "commandline": "C:/msys64/msys2_shell.cmd -defterm -here -no-start -ucrt64 -shell zsh",
+    "commandline": "C:/msys64/msys2_shell.cmd -defterm -here -no-start -ucrt64 -shell zsh -use-full-path",
     "icon": "C:/msys64/msys2.ico",
     "startingDirectory": "~",
     "fontFace": "MesloLGS NF",
@@ -645,6 +659,7 @@ MSYS2 is also **not** auto-detected. Add it manually to `settings.json`:
 > - `-no-start` — don't open a new window (stay inside Windows Terminal)
 > - `-ucrt64` — use the UCRT64 environment (modern, recommended)
 > - `-shell zsh` — launch Zsh directly
+> - `-use-full-path` — inherit your Windows PATH so `winget`-installed tools are visible
 
 > If you installed MSYS2 via `winget`, the default path is `C:\msys64`. Adjust if different.
 
