@@ -106,6 +106,14 @@ fi
 # ============================================
 # ls Aliases (use eza/exa if available, else fallback)
 # ============================================
+# On MSYS/Git Bash, the default profile sets
+#   alias ls='ls --show-control-chars'
+# which causes "eza: Unknown argument --show-control-chars"
+# when our alias/function is layered on top. Remove it first.
+if [ "$_dotfiles_is_msys" = 1 ]; then
+    unalias ls ll la lt 2>/dev/null
+fi
+
 if _has_cmd eza; then
     if [ "$_dotfiles_is_msys" = 1 ] && _has_cmd cygpath; then
         # Wrapper functions so eza receives Windows paths.
@@ -164,13 +172,13 @@ alias bashrc='vim ~/.bashrc'
 alias vimrc='vim ~/.vimrc'
 alias p10k-cfg='vim ${DOTFILES_DIR:-$HOME/.dotfiles}/.p10k.zsh'
 alias dotfiles='cd ${DOTFILES_DIR:-$HOME/.dotfiles} && git pull'
-alias dotsync='git -C ${DOTFILES_DIR:-$HOME/.dotfiles} pull && \
+alias dotsync='(cd ${DOTFILES_DIR:-$HOME/.dotfiles} && git pull) && \
   ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.zshrc    ~/.zshrc && \
   ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.p10k.zsh ~/.p10k.zsh && \
   ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.vimrc    ~/.vimrc && \
   ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.bashrc   ~/.bashrc && \
   echo "✅ Dotfiles synced (symlinked)." && source ~/.zshrc'
-alias dotsync-cp='git -C ${DOTFILES_DIR:-$HOME/.dotfiles} pull && \
+alias dotsync-cp='(cd ${DOTFILES_DIR:-$HOME/.dotfiles} && git pull) && \
   cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.zshrc    ~/.zshrc && \
   cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.p10k.zsh ~/.p10k.zsh && \
   cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.vimrc    ~/.vimrc && \
