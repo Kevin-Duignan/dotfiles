@@ -453,8 +453,8 @@ git clone https://github.com/zsh-users/zsh-syntax-highlighting \
 git clone https://github.com/fdellwing/zsh-bat \
   "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-bat"
 
-git clone https://github.com/MichaelAqworter-Andi/zsh-you-should-use \
-  "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/you-should-use"
+git clone https://github.com/MichaelAquilina/zsh-you-should-use.git \
+   "${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/you-should-use"
 ```
 
 
