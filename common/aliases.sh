@@ -63,7 +63,7 @@ alias zshals='vim ${DOTFILES_DIR:-$HOME/.dotfiles}/common/aliases.sh'
 alias zshfunc='vim ${DOTFILES_DIR:-$HOME/.dotfiles}/common/functions.sh'
 alias bashrc='vim ~/.bashrc'
 alias vimrc='vim ~/.vimrc'
-alias dotfiles='cd ${DOTFILES_DIR:-$HOME/.dotfiles}'
+alias dotfiles='cd ${DOTFILES_DIR:-$HOME/.dotfiles} && git pull'
 alias dotsync='git -C ${DOTFILES_DIR:-$HOME/.dotfiles} pull && \
   ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.zshrc  ~/.zshrc && \
   ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.vimrc  ~/.vimrc && \
