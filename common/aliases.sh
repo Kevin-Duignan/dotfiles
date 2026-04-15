@@ -57,6 +57,23 @@ alias c='clear'
 alias h='history'
 alias j='jobs -l'
 alias path='echo -e ${PATH//:/\\n}'
+alias zshrc='vim ~/.zshrc'
+alias zshloc='vim ~/.zshrc.local'
+alias zshals='vim ${DOTFILES_DIR:-$HOME/.dotfiles}/common/aliases.sh'
+alias zshfunc='vim ${DOTFILES_DIR:-$HOME/.dotfiles}/common/functions.sh'
+alias bashrc='vim ~/.bashrc'
+alias vimrc='vim ~/.vimrc'
+alias dotfiles='cd ${DOTFILES_DIR:-$HOME/.dotfiles}'
+alias dotsync='git -C ${DOTFILES_DIR:-$HOME/.dotfiles} pull && \
+  ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.zshrc  ~/.zshrc && \
+  ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.vimrc  ~/.vimrc && \
+  ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.bashrc ~/.bashrc && \
+  echo "✅ Dotfiles synced (symlinked)." && source ~/.zshrc'
+alias dotsync-cp='git -C ${DOTFILES_DIR:-$HOME/.dotfiles} pull && \
+  cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.zshrc  ~/.zshrc && \
+  cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.vimrc  ~/.vimrc && \
+  cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.bashrc ~/.bashrc && \
+  echo "✅ Dotfiles synced (copied)." && source ~/.zshrc'
 
 
 if _has_cmd gh; then
