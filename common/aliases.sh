@@ -24,13 +24,52 @@ alias cp='cp -i'
 alias mv='mv -i'
 
 # ============================================
+# MSYS2 / Git Bash: Windows-native tool wrappers
+# ============================================
+# Tools installed via winget (eza, bat, fd, etc.) are Windows
+# binaries that don't understand MSYS2 Unix paths (/c/Users/…).
+# Since MSYS_NO_PATHCONV=1 disables automatic conversion, we
+# wrap these tools with a helper that converts path arguments
+# via cygpath before invoking the real binary.
+# ============================================
+_dotfiles_is_msys=0
+case "$(uname -s)" in
+    MINGW*|MSYS*) _dotfiles_is_msys=1 ;;
+esac
+
+# _win_wrap <cmd> [args...]
+# Converts any argument that looks like a Unix path (starts with /)
+# to a Windows path, then calls the real binary.
+if [ "$_dotfiles_is_msys" = 1 ] && _has_cmd cygpath; then
+    _win_wrap() {
+        local cmd="$1"; shift
+        local args=()
+        for arg in "$@"; do
+            case "$arg" in
+                /*) args+=("$(cygpath -w "$arg")") ;;
+                *)  args+=("$arg") ;;
+            esac
+        done
+        command "$cmd" "${args[@]}"
+    }
+fi
+
+# ============================================
 # ls Aliases (use eza/exa if available, else fallback)
 # ============================================
 if _has_cmd eza; then
-    alias ls='eza --icons --group-directories-first'
-    alias ll='eza -alh --icons --group-directories-first'
-    alias la='eza -a --icons --group-directories-first'
-    alias lt='eza --tree --level=2 --icons'
+    if [ "$_dotfiles_is_msys" = 1 ] && _has_cmd cygpath; then
+        # Wrapper functions so eza receives Windows paths
+        ls()  { _win_wrap eza --icons --group-directories-first "$@"; }
+        ll()  { _win_wrap eza -alh --icons --group-directories-first "$@"; }
+        la()  { _win_wrap eza -a --icons --group-directories-first "$@"; }
+        lt()  { _win_wrap eza --tree --level=2 --icons "$@"; }
+    else
+        alias ls='eza --icons --group-directories-first'
+        alias ll='eza -alh --icons --group-directories-first'
+        alias la='eza -a --icons --group-directories-first'
+        alias lt='eza --tree --level=2 --icons'
+    fi
 elif _has_cmd exa; then
     alias ls='exa --icons --group-directories-first'
     alias ll='exa -alh --icons --group-directories-first'
@@ -296,7 +335,11 @@ fi
 # Misc Tools (guarded)
 # ============================================
 if _has_cmd bat; then
-    alias cat='bat --paging=never'
+    if [ "$_dotfiles_is_msys" = 1 ] && _has_cmd cygpath; then
+        cat() { _win_wrap bat --paging=never "$@"; }
+    else
+        alias cat='bat --paging=never'
+    fi
 fi
 
 if _has_cmd zoxide; then
@@ -322,3 +365,6 @@ if _has_cmd docker; then
     alias dcd='docker compose down'
     alias dcl='docker compose logs -f'
 fi
+
+unset _dotfiles_is_msys
+
