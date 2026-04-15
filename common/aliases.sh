@@ -177,13 +177,15 @@ alias dotsync='(cd ${DOTFILES_DIR:-$HOME/.dotfiles} && git pull) && \
   ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.p10k.zsh ~/.p10k.zsh && \
   ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.vimrc    ~/.vimrc && \
   ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.bashrc   ~/.bashrc && \
-  echo "✅ Dotfiles synced (symlinked)." && source ~/.zshrc'
+  echo "✅ Dotfiles synced (symlinked)." && \
+  if [ -n "$ZSH_VERSION" ]; then source ~/.zshrc; else source ~/.bashrc; fi'
 alias dotsync-cp='(cd ${DOTFILES_DIR:-$HOME/.dotfiles} && git pull) && \
   cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.zshrc    ~/.zshrc && \
   cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.p10k.zsh ~/.p10k.zsh && \
   cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.vimrc    ~/.vimrc && \
   cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.bashrc   ~/.bashrc && \
-  echo "✅ Dotfiles synced (copied)." && source ~/.zshrc'
+  echo "✅ Dotfiles synced (copied)." && \
+  if [ -n "$ZSH_VERSION" ]; then source ~/.zshrc; else source ~/.bashrc; fi'
 
 # ============================================
 # Git Aliases (most-used from OMZ git plugin)
