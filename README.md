@@ -397,12 +397,15 @@ winget install MSYS2.MSYS2
 
 ```bash
 pacman -Syu
-pacman -S zsh git vim fzf fd bat
+pacman -S zsh git vim
 ```
 
 **Install tools not in pacman** — run these in PowerShell (not inside MSYS2):
 
 ```powershell
+winget install junegunn.fzf
+winget install sharkdp.fd
+winget install sharkdp.bat
 winget install astral-sh.uv
 winget install eza-community.eza
 winget install ajeetdsouza.zoxide
