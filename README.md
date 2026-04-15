@@ -8,6 +8,7 @@ A modular, multi-environment dotfiles repository that keeps macOS, Windows WSL, 
 ├── .zshrc                  # Zsh shell config  (macOS / WSL / MSYS2)
 │                           #   MSYS2: lightweight fast-path (no OMZ)
 │                           #   Others: full Oh My Zsh
+├── .p10k.zsh               # Powerlevel10k prompt config (all Zsh envs)
 ├── .vimrc                  # Vim editor config (all environments)
 ├── install.sh              # Entry point — detects OS, sources everything
 ├── common/
@@ -182,11 +183,13 @@ mkdir -p ~/.vim/{backup,swap,undo}
 
 ```bash
 # Back up any existing files first
-[ -f ~/.zshrc ] && mv ~/.zshrc ~/.zshrc.bak
-[ -f ~/.vimrc ] && mv ~/.vimrc ~/.vimrc.bak
+[ -f ~/.zshrc ]    && mv ~/.zshrc ~/.zshrc.bak
+[ -f ~/.p10k.zsh ] && mv ~/.p10k.zsh ~/.p10k.zsh.bak
+[ -f ~/.vimrc ]    && mv ~/.vimrc ~/.vimrc.bak
 
-ln -sf ~/.dotfiles/.zshrc ~/.zshrc
-ln -sf ~/.dotfiles/.vimrc ~/.vimrc
+ln -sf ~/.dotfiles/.zshrc    ~/.zshrc
+ln -sf ~/.dotfiles/.p10k.zsh ~/.p10k.zsh
+ln -sf ~/.dotfiles/.vimrc    ~/.vimrc
 ```
 
 **Install Vim plugins:**
@@ -303,13 +306,15 @@ mkdir -p ~/.vim/{backup,swap,undo}
 **Symlink the config files:**
 
 ```bash
-[ -f ~/.zshrc ] && mv ~/.zshrc ~/.zshrc.bak
-[ -f ~/.bashrc ] && mv ~/.bashrc ~/.bashrc.bak
-[ -f ~/.vimrc ] && mv ~/.vimrc ~/.vimrc.bak
+[ -f ~/.zshrc ]    && mv ~/.zshrc ~/.zshrc.bak
+[ -f ~/.bashrc ]   && mv ~/.bashrc ~/.bashrc.bak
+[ -f ~/.p10k.zsh ] && mv ~/.p10k.zsh ~/.p10k.zsh.bak
+[ -f ~/.vimrc ]    && mv ~/.vimrc ~/.vimrc.bak
 
-ln -sf ~/.dotfiles/.zshrc  ~/.zshrc
-ln -sf ~/.dotfiles/.bashrc ~/.bashrc
-ln -sf ~/.dotfiles/.vimrc  ~/.vimrc
+ln -sf ~/.dotfiles/.zshrc    ~/.zshrc
+ln -sf ~/.dotfiles/.bashrc   ~/.bashrc
+ln -sf ~/.dotfiles/.p10k.zsh ~/.p10k.zsh
+ln -sf ~/.dotfiles/.vimrc    ~/.vimrc
 ```
 
 **Install Vim plugins:**
@@ -548,16 +553,17 @@ mkdir -p ~/.vim/{backup,swap,undo}
 
 ```bash
 # Remove any existing files/symlinks (handles dangling symlinks too)
-rm -f ~/.zshrc ~/.vimrc
+rm -f ~/.zshrc ~/.p10k.zsh ~/.vimrc
 
 # Copy from dotfiles
-cp ~/.dotfiles/.zshrc ~/.zshrc
-cp ~/.dotfiles/.vimrc ~/.vimrc
+cp ~/.dotfiles/.zshrc    ~/.zshrc
+cp ~/.dotfiles/.p10k.zsh ~/.p10k.zsh
+cp ~/.dotfiles/.vimrc    ~/.vimrc
 ```
 
 > **Keeping in sync:** After a `git pull` inside `~/.dotfiles`, re-run the copy commands above to pick up changes. Or add a helper alias in your `local.sh`:
 > ```bash
-> alias dfsync='cp ~/.dotfiles/.zshrc ~/.zshrc && cp ~/.dotfiles/.vimrc ~/.vimrc && rm -rf ~/.cache/dotfiles ~/.cache/fzf-init.zsh && source ~/.zshrc'
+> alias dfsync='cp ~/.dotfiles/.zshrc ~/.zshrc && cp ~/.dotfiles/.p10k.zsh ~/.p10k.zsh && cp ~/.dotfiles/.vimrc ~/.vimrc && rm -rf ~/.cache/dotfiles ~/.cache/fzf-init.zsh && source ~/.zshrc'
 > ```
 > The `dfsync` alias also clears the cached tool init scripts so they get regenerated on the next shell startup.
 
@@ -915,12 +921,13 @@ cd ~/.dotfiles && git pull && source ~/.zshrc   # or: source ~/.bashrc
 
 ```bash
 # Restore your backups
-[ -f ~/.zshrc.bak ]  && mv ~/.zshrc.bak  ~/.zshrc
-[ -f ~/.bashrc.bak ] && mv ~/.bashrc.bak ~/.bashrc
-[ -f ~/.vimrc.bak ]  && mv ~/.vimrc.bak  ~/.vimrc
+[ -f ~/.zshrc.bak ]    && mv ~/.zshrc.bak    ~/.zshrc
+[ -f ~/.bashrc.bak ]   && mv ~/.bashrc.bak   ~/.bashrc
+[ -f ~/.p10k.zsh.bak ] && mv ~/.p10k.zsh.bak ~/.p10k.zsh
+[ -f ~/.vimrc.bak ]    && mv ~/.vimrc.bak    ~/.vimrc
 
 # Or just remove the symlinks
-rm -f ~/.zshrc ~/.bashrc ~/.vimrc
+rm -f ~/.zshrc ~/.bashrc ~/.p10k.zsh ~/.vimrc
 
 # Remove the repo
 rm -rf ~/.dotfiles
