@@ -57,6 +57,11 @@ if command -v zoxide >/dev/null 2>&1; then
     eval "$(zoxide init bash)"
 fi
 
+# delta (beautiful git diffs) — configure as git pager
+if command -v delta >/dev/null 2>&1; then
+    export GIT_PAGER='delta'
+fi
+
 # uv — fast Python package manager completions
 if command -v uv >/dev/null 2>&1; then
     eval "$(uv generate-shell-completion bash)"

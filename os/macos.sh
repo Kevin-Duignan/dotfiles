@@ -95,6 +95,8 @@ if command -v fzf >/dev/null 2>&1; then
     export FZF_DEFAULT_OPTS="--ansi --layout=reverse --border=rounded --height=60%"
     if command -v fd >/dev/null 2>&1; then
         export FZF_DEFAULT_COMMAND='fd --type f --hidden --exclude .git'
+    elif command -v rg >/dev/null 2>&1; then
+        export FZF_DEFAULT_COMMAND='rg --files --hidden --glob "!.git"'
     fi
     # Use fzf's native Zsh integration (0.48+)
     DISABLE_FZF_KEY_BINDINGS="true"
@@ -105,6 +107,11 @@ fi
 # zoxide (smart cd)
 if command -v zoxide >/dev/null 2>&1; then
     eval "$(zoxide init zsh)"
+fi
+
+# delta (beautiful git diffs) — configure as git pager
+if command -v delta >/dev/null 2>&1; then
+    export GIT_PAGER='delta'
 fi
 
 # nvm (Node Version Manager)

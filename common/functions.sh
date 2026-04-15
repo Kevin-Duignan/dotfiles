@@ -61,11 +61,20 @@ wfzf() {
     fi
 }
 
-# fzf with fd for fast file finding
+# fzf with fd for fast file finding (bat preview if available)
 ffzf() {
+    local preview_cmd
+    if _has_cmd bat; then
+        preview_cmd='bat --color=always --style=numbers --line-range=:100 {}'
+    else
+        preview_cmd='head -100 {}'
+    fi
     if _has_cmd fd; then
         fd --type f --hidden --follow --exclude .git | \
-            fzf --multi --preview 'head -100 {}' --bind 'focus:transform-header:file --brief {}'
+            fzf --multi --preview "$preview_cmd" --bind 'focus:transform-header:file --brief {}'
+    elif _has_cmd rg; then
+        rg --files --hidden --glob '!.git' | \
+            fzf --multi --preview "$preview_cmd"
     else
         find . -type f -not -path '*/.git/*' | \
             fzf --multi --preview 'head -100 {}'

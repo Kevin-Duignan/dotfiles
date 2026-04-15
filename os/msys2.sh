@@ -121,6 +121,11 @@ tounixpath() {
 (( ${+commands[bat]} )) && export MANPAGER="bat -plman"
 
 # ============================================
+# delta (beautiful git diffs) — configure as git pager
+# ============================================
+(( ${+commands[delta]} )) && export GIT_PAGER='delta'
+
+# ============================================
 # Helper: cached eval — run "tool <args>" once,
 # cache the output, re-source from cache on startup.
 # Cache is invalidated when the binary is newer than

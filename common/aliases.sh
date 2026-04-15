@@ -16,12 +16,61 @@ else
 fi
 
 # ============================================
-# Safer File Operations
+# Safer File Operations (with faster replacements)
 # ============================================
 alias mkdir='mkdir -pv'
-alias rm='rm -i'
-alias cp='cp -i'
+
+# cp → xcp (parallel, reflink-aware copy)
+if _has_cmd xcp; then
+    alias cp='xcp'
+else
+    alias cp='cp -i'
+fi
+
+# rm → rip (rm-improved: safer rm with graveyard)
+if _has_cmd rip; then
+    alias rm='rip'
+else
+    alias rm='rm -i'
+fi
+
 alias mv='mv -i'
+
+# ============================================
+# sed → sd (simpler syntax, faster)
+# ============================================
+if _has_cmd sd; then
+    alias sed='sd'
+fi
+
+# ============================================
+# du → dust (intuitive disk usage)
+# ============================================
+if _has_cmd dust; then
+    alias du='dust'
+fi
+
+# ============================================
+# top/ps → procs (better process viewer)
+# ============================================
+if _has_cmd procs; then
+    alias ps='procs'
+fi
+
+# ============================================
+# curl → xh (httpie-like, fast HTTP client)
+# ============================================
+if _has_cmd xh; then
+    alias http='xh'
+    alias https='xh --https'
+fi
+
+# ============================================
+# diff → delta (beautiful diffs, also used as git pager)
+# ============================================
+if _has_cmd delta; then
+    alias diff='delta'
+fi
 
 # ============================================
 # MSYS2 / Git Bash: Windows-native tool wrappers
@@ -83,11 +132,20 @@ else
 fi
 
 # ============================================
-# grep with Color
+# grep / ripgrep
 # ============================================
-alias grep='grep --color=auto'
-alias fgrep='fgrep --color=auto'
-alias egrep='egrep --color=auto'
+if _has_cmd rg; then
+    alias grep='rg --color=auto'
+    alias fgrep='rg --fixed-strings --color=auto'
+    alias egrep='rg --color=auto'
+    # Convenience: recursive grep (rg already recurses by default)
+    alias rga='rg --hidden --no-ignore'
+    alias rgi='rg --ignore-case'
+else
+    alias grep='grep --color=auto'
+    alias fgrep='fgrep --color=auto'
+    alias egrep='egrep --color=auto'
+fi
 
 # ============================================
 # System / Shell
@@ -267,8 +325,13 @@ fi
 # ============================================
 # History Aliases (from OMZ history plugin)
 # ============================================
-alias hs='history | grep'
-alias hsi='history | grep -i'
+if _has_cmd rg; then
+    alias hs='history | rg'
+    alias hsi='history | rg -i'
+else
+    alias hs='history | grep'
+    alias hsi='history | grep -i'
+fi
 
 # ============================================
 # Pip Aliases (from OMZ pip plugin)
@@ -277,7 +340,11 @@ if _has_cmd pip || _has_cmd pip3; then
     alias pipi='pip install'
     alias pipu='pip install --upgrade'
     alias pipun='pip uninstall'
-    alias pipgi='pip freeze | grep'
+    if _has_cmd rg; then
+        alias pipgi='pip freeze | rg'
+    else
+        alias pipgi='pip freeze | grep'
+    fi
     alias piplo='pip list -o'
     alias pipreq='pip freeze > requirements.txt'
     alias pipir='pip install -r requirements.txt'
@@ -289,7 +356,11 @@ fi
 if _has_cmd python3; then
     alias py='python3'
     alias pyfind='find . -name "*.py"'
-    alias pygrep='grep -nr --include="*.py"'
+    if _has_cmd rg; then
+        alias pygrep='rg --type py'
+    else
+        alias pygrep='grep -nr --include="*.py"'
+    fi
     alias pyserver='python3 -m http.server'
 fi
 
