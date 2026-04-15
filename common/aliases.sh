@@ -108,11 +108,13 @@ fi
 # ============================================
 if _has_cmd eza; then
     if [ "$_dotfiles_is_msys" = 1 ] && _has_cmd cygpath; then
-        # Wrapper functions so eza receives Windows paths
-        ls()  { _win_wrap eza --icons --group-directories-first "$@"; }
-        ll()  { _win_wrap eza -alh --icons --group-directories-first "$@"; }
-        la()  { _win_wrap eza -a --icons --group-directories-first "$@"; }
-        lt()  { _win_wrap eza --tree --level=2 --icons "$@"; }
+        # Wrapper functions so eza receives Windows paths.
+        # Use "function" keyword to prevent Bash from expanding
+        # any pre-existing aliases during function definition.
+        function ls  { _win_wrap eza --icons --group-directories-first "$@"; }
+        function ll  { _win_wrap eza -alh --icons --group-directories-first "$@"; }
+        function la  { _win_wrap eza -a --icons --group-directories-first "$@"; }
+        function lt  { _win_wrap eza --tree --level=2 --icons "$@"; }
     else
         alias ls='eza --icons --group-directories-first'
         alias ll='eza -alh --icons --group-directories-first'
@@ -407,7 +409,7 @@ fi
 # ============================================
 if _has_cmd bat; then
     if [ "$_dotfiles_is_msys" = 1 ] && _has_cmd cygpath; then
-        cat() { _win_wrap bat --paging=never "$@"; }
+        function cat { _win_wrap bat --paging=never "$@"; }
     else
         alias cat='bat --paging=never'
     fi
