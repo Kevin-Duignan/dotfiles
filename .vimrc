@@ -1,22 +1,38 @@
-"Enable syntax highlighting and filetype detection
+" ============================================
+" ~/.vimrc — Global Vim Configuration
+" ============================================
+" Shared across macOS, WSL, Git Bash, and MSYS2.
+" On MSYS2/Git Bash a minimal plugin set is loaded
+" (Vim's file I/O is slow on Windows POSIX emulation).
+" All other platforms get the full plugin stack.
+" ============================================
+
+" --- Environment detection ---
+" $MSYSTEM is set by MSYS2 and Git Bash (e.g. UCRT64, MINGW64, MSYS)
+let s:is_windows_posix = !empty($MSYSTEM)
+
+" ============================================
+" Core Settings (all platforms)
+" ============================================
 syntax on
 filetype plugin indent on
+set nocompatible
 
-" Set mapleader
 let mapleader=" "
 
-" UI settings
+" UI
 set number
+set relativenumber
 set mouse=a
 set ruler
 set showmatch
-set relativenumber
 set splitbelow
 set splitright
 set lazyredraw
 set visualbell
+set laststatus=2
 
-" Yank settings
+" Clipboard
 set clipboard^=unnamed,unnamedplus
 
 " Indentation
@@ -26,19 +42,18 @@ set expandtab
 set tabstop=4
 set shiftwidth=4
 
-" Search behaviour
+" Search
 set incsearch
 set ignorecase
 set smartcase
 
-" Clear search highlight when entering insert mode or cursor moved
 autocmd InsertEnter * :nohlsearch
 autocmd CursorMoved * :nohlsearch
 
-" Backspace behaviour
+" Backspace
 set backspace=indent,start,eol
 
-" Completion settings
+" Completion
 set wildmenu
 set wildmode=list:longest,full
 set completeopt=menuone,noinsert,noselect
@@ -50,154 +65,107 @@ set backupdir=~/.vim/backup//
 set directory=~/.vim/swap//
 set undodir=~/.vim/undo//
 
-" Automatically reload files changed outside Vim
+" Auto-reload
 set autoread
 autocmd BufEnter * checktime
 
-" Plugin manager
+" ============================================
+" Plugins
+" ============================================
 call plug#begin('~/.vim/plugged')
 
-" Linting and fixing
-Plug 'dense-analysis/ale'
-
-" Lazy loading
-Plug 'preservim/nerdtree', { 'on': 'NERDTreeToggle' }
-
-" Auto-completion
-Plug 'prabirshrestha/vim-lsp'
-Plug 'mattn/vim-lsp-settings'
-Plug 'prabirshrestha/asyncomplete.vim'
-
-" Status line
-Plug 'itchyny/lightline.vim'
-
-" Code commenting
+" --- Always loaded (lightweight, zero-config) ---
 Plug 'tpope/vim-commentary'
-
-" Fuzzy finder
-Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
-Plug 'junegunn/fzf.vim'
-
-" Enhance surrounding delimiters (quotes, brackets, etc.) - A classic must-have
 Plug 'tpope/vim-surround'
-
-" Seamless Git integration and commands within Vim
+Plug 'tpope/vim-unimpaired'
+Plug 'jiangmiao/auto-pairs'
 Plug 'tpope/vim-fugitive'
-
-" Show git diff signs in the gutter (sign column)
 Plug 'airblade/vim-gitgutter'
 
-" Indentation guides for better visual structure
-Plug 'nathanaelkane/vim-indent-guides'
-
-" Auto-closes parentheses, brackets, and quotes
-Plug 'jiangmiao/auto-pairs'
-
-" Enhanced text object manipulations (e.g., around/inside quotes, blocks)
-Plug 'tpope/vim-unimpaired'
-
-" Super-charged motion for jumping quickly within a file
-Plug 'easymotion/vim-easymotion'
-
-" Always-on highlight for a unique character in every word on a line to help you use f, F and family.
-Plug 'unblevable/quick-scope'
-
-" Better syntax highlighting for a vast number of languages
-Plug 'sheerun/vim-polyglot'
+if !s:is_windows_posix
+    " --- Full stack (macOS / WSL / Linux only) ---
+    Plug 'dense-analysis/ale'
+    Plug 'preservim/nerdtree', { 'on': 'NERDTreeToggle' }
+    Plug 'prabirshrestha/vim-lsp'
+    Plug 'mattn/vim-lsp-settings'
+    Plug 'prabirshrestha/asyncomplete.vim'
+    Plug 'itchyny/lightline.vim'
+    Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
+    Plug 'junegunn/fzf.vim'
+    Plug 'nathanaelkane/vim-indent-guides'
+    Plug 'easymotion/vim-easymotion'
+    Plug 'unblevable/quick-scope'
+    Plug 'sheerun/vim-polyglot'
+endif
 
 call plug#end()
 
-" --- EasyMotion Custom Configuration ---
-let g:EasyMotion_do_mapping = 0
-nmap <Leader>f <Plug>(easymotion-bd-f)
-nmap <Leader>t <Plug>(easymotion-bd-t)
-nmap / <Plug>(easymotion-bd-fn)
-nmap n <Plug>(easymotion-bd-n)
-nmap <Leader>w <Plug>(easymotion-bd-w)
-nmap <Leader>e <Plug>(easymotion-bd-e)
-let g:EasyMotion_smartcase = 1
-map <Leader>j <Plug>(easymotion-j)
-map <Leader>k <Plug>(easymotion-k)
+" ============================================
+" Plugin Config — Full stack only
+" ============================================
+if !s:is_windows_posix
 
-" Disable compatibility for vim-polygot to work
-set nocompatible
-let g:vim_markdown_math = 1
-let g:vim_markdown_frontmatter = 1
-let g:vim_markdown_json_frontmatter = 1
+    " --- EasyMotion ---
+    let g:EasyMotion_do_mapping = 0
+    nmap <Leader>f <Plug>(easymotion-bd-f)
+    nmap <Leader>t <Plug>(easymotion-bd-t)
+    nmap / <Plug>(easymotion-bd-fn)
+    nmap n <Plug>(easymotion-bd-n)
+    nmap <Leader>w <Plug>(easymotion-bd-w)
+    nmap <Leader>e <Plug>(easymotion-bd-e)
+    let g:EasyMotion_smartcase = 1
+    map <Leader>j <Plug>(easymotion-j)
+    map <Leader>k <Plug>(easymotion-k)
 
-" --- ALE (Asynchronous Lint Engine) Configuration ---
+    " --- vim-polyglot ---
+    let g:vim_markdown_math = 1
+    let g:vim_markdown_frontmatter = 1
+    let g:vim_markdown_json_frontmatter = 1
 
-" Enable linting automatically when opening a file, inserting text, or saving
-let g:ale_lint_on_enter = 1
-let g:ale_lint_on_text_changed = 1
-let g:ale_lint_on_save = 1
+    " --- ALE ---
+    let g:ale_lint_on_enter = 1
+    let g:ale_lint_on_text_changed = 1
+    let g:ale_lint_on_save = 1
+    let g:ale_signs_error = '✗'
+    let g:ale_signs_warning = '!'
+    let g:ale_set_highlights = 1
+    highlight link ALEErrorSign ErrorMsg
+    highlight link ALEWarningSign Todo
+    let g:ale_statusline_format = ['%d error(s)', '%d warning(s)', 'OK']
+    let g:ale_open_list = 0
 
-" Show error and warning signs in the gutter (sign column)
-" This gives you immediate visual feedback next to the line numbers
-let g:ale_signs_error = '✗'
-let g:ale_signs_warning = '!'
+    " --- Autocomplete ---
+    set completeopt=menuone,noinsert,preview
+    autocmd! CompleteDone * if pumvisible() == 0 | pclose | endif
 
-" Highlight the lines containing errors or warnings
-let g:ale_set_highlights = 1
-highlight link ALEErrorSign ErrorMsg
-highlight link ALEWarningSign Todo
+    " --- Lightline ---
+    let g:lightline = {
+          \ 'colorscheme': 'wombat',
+          \ 'active': {
+          \   'left': [ [ 'mode', 'paste' ],
+          \             [ 'readonly', 'filename', 'modified', 'gitbranch' ] ],
+          \   'right': [ [ 'lineinfo' ], [ 'percent' ], [ 'filetype' ] ]
+          \ },
+          \ 'component_function': {
+          \   'gitbranch': 'FugitiveHead',
+          \ }
+          \ }
 
-" Show current error/warning in the Vim status line (works well with lightline.vim)
-let g:ale_statusline_format = ['%d error(s)', '%d warning(s)', 'OK']
+    " --- NERDTree ---
+    nnoremap <C-n> :NERDTreeToggle<CR>
 
-" Allow ALE to fix the file automatically when you save it (optional, needs external fixers like eslint, black, etc.)
-" You still need the specific fixers installed on your system for this to work
-" let g:ale_fix_on_save = 1
-" let g:ale_fixers = {
-" \ '*': ['remove_trailing_whitespace'],
-" \ 'python': ['black'],
-" \ 'javascript': ['eslint'],
-" \ }
+    " --- FZF ---
+    nnoremap <C-p> :Files<CR>
 
-" Integrate ALE diagnostics with the quickfix/location list (accessible via :Errors or :lopen)
-let g:ale_open_list = 0 " Don't open the list automatically, use :Errors or :lopen manually
+endif
 
-" --- Autocomplete Visual Enhancements ---
-" Your existing asyncomplete.vim setup will work, but to make the completion menu more visually descriptive (show documentation in a preview window):
-set completeopt=menuone,noinsert,preview
-
-" This option ensures that the preview window for documentation closes automatically when you stop navigating the completion menu.
-autocmd! CompleteDone * if pumvisible() == 0 | pclose | endif
-
-" Lightline configuration
-let g:lightline = {
-      \ 'colorscheme': 'wombat',
-      \ 'active': {
-      \   'left': [ [ 'mode', 'paste' ],
-      \             [ 'readonly', 'filename', 'modified', 'gitbranch' ] ],
-      \   'right': [ [ 'lineinfo' ], [ 'percent' ], [ 'filetype' ] ]
-      \ },
-      \ 'component_function': {
-      \   'gitbranch': 'FugitiveHead',
-      \ }
-      \ }
-
-set laststatus=2
-
-" NERDTree toggle
-nnoremap <C-n> :NERDTreeToggle<CR>
-
-" FZF file search
-nnoremap <C-p> :Files<CR>
-
-" Remap Esc
+" ============================================
+" Keymaps (all platforms)
+" ============================================
 inoremap <C-[> <Esc>
-
-" Select whole file with Ctrl-A
 nnoremap <C-a> ggVG
-
-" Reload vimrc without restarting
 nnoremap <leader>sv :source $MYVIMRC<CR>
-
-" Toggle search highlight
 nnoremap <leader>h :set hlsearch!<CR>
-
-" move vertically by visual line with j and k
 nnoremap j gj
 nnoremap k gk
 
