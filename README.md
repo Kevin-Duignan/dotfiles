@@ -488,6 +488,18 @@ C:/msys64/msys2_shell.cmd -defterm -here -no-start -ucrt64 -shell zsh -use-full-
 
 > Use this as the command line in your Windows Terminal profile (see [Profile: MSYS2](#profile-msys2) below). The `-shell zsh` flag starts Zsh directly — no `.bashrc` hack needed. The `-use-full-path` flag inherits your Windows PATH so tools installed via `winget` are visible inside MSYS2.
 
+**Set `HOME` to your real Windows home** — by default MSYS2 sets `HOME` to `/c/msys64/home/<username>/`, which is an isolated directory invisible to the rest of Windows. Override it so `~` points to your real Windows profile (`C:\Users\<username>`), sharing `.ssh/`, `.gitconfig`, `.dotfiles/`, etc. with VS Code, PowerShell, and Git GUI clients.
+
+In your Windows Terminal profile, add an `environment` block (see [Profile: MSYS2](#profile-msys2) below):
+
+```json
+"environment": {
+    "HOME": "%USERPROFILE%"
+}
+```
+
+> Alternatively, you can set `HOME` system-wide via Windows environment variables (`System Properties → Environment Variables → User variables → New → HOME = %USERPROFILE%`), but the Windows Terminal profile approach keeps it scoped to MSYS2 only.
+
 **Clone the repo:**
 
 ```bash
@@ -732,11 +744,14 @@ MSYS2 is also **not** auto-detected. Add it manually to `settings.json`:
     "name": "MSYS2 (Zsh)",
     "commandline": "C:/msys64/msys2_shell.cmd -defterm -here -no-start -ucrt64 -shell zsh -use-full-path",
     "icon": "C:/msys64/msys2.ico",
-    "startingDirectory": "~",
+    "startingDirectory": "%USERPROFILE%",
     "fontFace": "MesloLGS NF",
     "fontSize": 12,
     "cursorShape": "bar",
-    "colorScheme": "One Half Dark"
+    "colorScheme": "One Half Dark",
+    "environment": {
+        "HOME": "%USERPROFILE%"
+    }
 }
 ```
 
@@ -746,7 +761,9 @@ MSYS2 is also **not** auto-detected. Add it manually to `settings.json`:
 > - `-no-start` — don't open a new window (stay inside Windows Terminal)
 > - `-ucrt64` — use the UCRT64 environment (modern, recommended)
 > - `-shell zsh` — launch Zsh directly
-> - `-use-full-path` - allow visibility of plugins installed via `winget`
+> - `-use-full-path` — allow visibility of tools installed via `winget`
+>
+> **`HOME` override:** Without `"environment": { "HOME": "%USERPROFILE%" }`, MSYS2 defaults `~` to `/c/msys64/home/<username>/` — an isolated directory invisible to the rest of Windows. The override makes `~` point to `/c/Users/<username>/` so `.dotfiles/`, `.ssh/`, `.gitconfig`, etc. are shared with VS Code, PowerShell, and Git GUI clients.
 
 > If you installed MSYS2 via `winget`, the default path is `C:\msys64`. Adjust if different.
 
