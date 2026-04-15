@@ -4,6 +4,15 @@
 # Sourced by: macOS (Zsh), WSL (Zsh/Bash), Git Bash, MSYS2 (Zsh)
 # ============================================
 
+# Fast tool detection (may already be defined by aliases.sh)
+if ! command -v _has_cmd >/dev/null 2>&1; then
+    if [ -n "$ZSH_VERSION" ]; then
+        _has_cmd() { (( ${+commands[$1]} )); }
+    else
+        _has_cmd() { command -v "$1" >/dev/null 2>&1; }
+    fi
+fi
+
 # ============================================
 # Git Helpers
 # ============================================
@@ -28,7 +37,7 @@ gswhv() {
 
 # Interactive file open with fzf
 vimi() {
-    if command -v fzf >/dev/null 2>&1; then
+    if _has_cmd fzf; then
         vim "$(fzf)"
     else
         echo "fzf is not installed."
@@ -36,7 +45,7 @@ vimi() {
 }
 
 openi() {
-    if command -v fzf >/dev/null 2>&1; then
+    if _has_cmd fzf; then
         open "$(fzf)"
     else
         echo "fzf is not installed."
@@ -54,7 +63,7 @@ wfzf() {
 
 # fzf with fd for fast file finding
 ffzf() {
-    if command -v fd >/dev/null 2>&1; then
+    if _has_cmd fd; then
         fd --type f --hidden --follow --exclude .git | \
             fzf --multi --preview 'head -100 {}' --bind 'focus:transform-header:file --brief {}'
     else
@@ -65,7 +74,7 @@ ffzf() {
 
 # Docker compose log viewer with fzf
 fzfdlog() {
-    if ! command -v docker >/dev/null 2>&1; then
+    if ! _has_cmd docker; then
         echo "Docker is not installed."
         return 1
     fi
@@ -92,7 +101,7 @@ y() {
     if [ -n "$1" ]; then
         if [ -d "$1" ]; then
             _y "$1"
-        elif command -v zoxide >/dev/null 2>&1; then
+        elif _has_cmd zoxide; then
             _y "$(zoxide query "$1")"
         else
             echo "zoxide not installed; pass a valid directory path."
@@ -108,7 +117,7 @@ y() {
 # Diff Helpers
 # ============================================
 batdiff() {
-    if command -v bat >/dev/null 2>&1; then
+    if _has_cmd bat; then
         git diff --name-only --relative --diff-filter=d -z | xargs -0 bat --diff
     else
         git diff
@@ -156,9 +165,9 @@ mkcd() {
 # ============================================
 serve() {
     local port="${1:-8000}"
-    if command -v python3 >/dev/null 2>&1; then
+    if _has_cmd python3; then
         python3 -m http.server "$port"
-    elif command -v python >/dev/null 2>&1; then
+    elif _has_cmd python; then
         python -m SimpleHTTPServer "$port"
     else
         echo "Python is not installed."

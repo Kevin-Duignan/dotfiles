@@ -1,159 +1,202 @@
-# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
-# Initialization code that may require console input (password prompts, [y/n]
-# confirmations, etc.) must go above this block; everything else may go below.
+# ============================================
+# ~/.zshrc — Global Zsh Configuration
+# ============================================
+# This file is shared across macOS, WSL, and MSYS2.
+# MSYS2 uses a lightweight fast-path that skips Oh My Zsh
+# entirely (subprocess forks are 10-50x slower on Windows
+# POSIX emulation). All other platforms use the full OMZ stack.
+# ============================================
+
+# ============================================
+# Detect MSYS2 early (before any heavy work)
+# ============================================
+_DOTFILES_IS_MSYS2=0
+case "$(uname -s)" in
+    MINGW*|MSYS*) _DOTFILES_IS_MSYS2=1 ;;
+esac
+
+# ============================================
+# Powerlevel10k Instant Prompt (all platforms)
+# Must stay near the top — no console input below this.
+# ============================================
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+    source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
-# If you come from bash you might have to change your $PATH.
-# export PATH=$HOME/bin:$HOME/.local/bin:/usr/local/bin:$PATH
+# ============================================
+# History (shared — all platforms)
+# ============================================
+HISTFILE="$HOME/.zsh_history"
+HIST_STAMPS="mm/dd/yyyy"
+if (( _DOTFILES_IS_MSYS2 )); then
+    # Smaller history = faster startup on NTFS
+    HISTSIZE=50000
+    SAVEHIST=50000
+else
+    HISTSIZE=10000000
+    SAVEHIST=10000000
+fi
+setopt APPEND_HISTORY
+setopt HIST_EXPIRE_DUPS_FIRST
+setopt HIST_FIND_NO_DUPS
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_IGNORE_DUPS
+setopt HIST_IGNORE_SPACE
+setopt HIST_NO_STORE
+setopt HIST_REDUCE_BLANKS
+setopt HIST_SAVE_NO_DUPS
+setopt INC_APPEND_HISTORY
+setopt SHARE_HISTORY
+SHELL_SESSION_HISTORY=0
+
+# ##########################################################
+# MSYS2 FAST PATH — skip Oh My Zsh, load features directly
+# ##########################################################
+if (( _DOTFILES_IS_MSYS2 )); then
+
+    export ZSH="$HOME/.oh-my-zsh"
+    _ZSH_CUSTOM="${ZSH_CUSTOM:-$ZSH/custom}"
+
+    # --------------------------------------------------
+    # Completions — cached compinit (once per day)
+    # --------------------------------------------------
+    autoload -Uz compinit
+    _comp_dump="$HOME/.zcompdump"
+    # Regenerate only if older than 24h (stat -c on MSYS2)
+    if [[ -f "$_comp_dump" ]]; then
+        # MSYS2 stat uses GNU coreutils format
+        _dump_age=$(( $(date +%s) - $(stat -c %Y "$_comp_dump" 2>/dev/null || echo 0) ))
+        if (( _dump_age > 86400 )); then
+            compinit -d "$_comp_dump"
+        else
+            compinit -C -d "$_comp_dump"   # -C = skip security check, use cache
+        fi
+    else
+        compinit -d "$_comp_dump"
+    fi
+    unset _comp_dump _dump_age
+
+    # --------------------------------------------------
+    # Vi-mode (replaces OMZ vi-mode plugin)
+    # --------------------------------------------------
+    bindkey -v
+    export KEYTIMEOUT=1
+
+    # --------------------------------------------------
+    # Colored man pages (replaces OMZ colored-man-pages)
+    # --------------------------------------------------
+    export LESS_TERMCAP_mb=$'\e[1;31m'
+    export LESS_TERMCAP_md=$'\e[1;36m'
+    export LESS_TERMCAP_me=$'\e[0m'
+    export LESS_TERMCAP_so=$'\e[01;33m'
+    export LESS_TERMCAP_se=$'\e[0m'
+    export LESS_TERMCAP_us=$'\e[1;32m'
+    export LESS_TERMCAP_ue=$'\e[0m'
+
+    # --------------------------------------------------
+    # Powerlevel10k — load directly (no OMZ theme engine)
+    # --------------------------------------------------
+    _p10k_theme="$_ZSH_CUSTOM/themes/powerlevel10k/powerlevel10k.zsh-theme"
+    [[ -f "$_p10k_theme" ]] && source "$_p10k_theme"
+    unset _p10k_theme
+
+    # --------------------------------------------------
+    # Plugins — source directly (no OMZ plugin loader)
+    # Only the three that matter most for interactive use.
+    # --------------------------------------------------
+    # zsh-autosuggestions
+    _plug="$_ZSH_CUSTOM/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"
+    [[ -f "$_plug" ]] && source "$_plug"
+
+    # zsh-syntax-highlighting (must be near last)
+    _plug="$_ZSH_CUSTOM/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+    [[ -f "$_plug" ]] && source "$_plug"
+
+    # you-should-use (alias reminders)
+    _plug="$_ZSH_CUSTOM/plugins/you-should-use/you-should-use.plugin.zsh"
+    [[ -f "$_plug" ]] && source "$_plug"
+
+    unset _plug _ZSH_CUSTOM
+
+    # --------------------------------------------------
+    # P10k config
+    # --------------------------------------------------
+    [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+
+    # --------------------------------------------------
+    # FZF — cache the init script instead of forking
+    # --------------------------------------------------
+    _fzf_cache="${XDG_CACHE_HOME:-$HOME/.cache}/fzf-init.zsh"
+    if (( ${+commands[fzf]} )); then
+        if [[ ! -f "$_fzf_cache" || "${commands[fzf]}" -nt "$_fzf_cache" ]]; then
+            mkdir -p "${_fzf_cache:h}"
+            fzf --zsh > "$_fzf_cache" 2>/dev/null
+        fi
+        [[ -f "$_fzf_cache" ]] && source "$_fzf_cache"
+        export FZF_DEFAULT_OPTS="--ansi --layout=reverse --border=rounded --height=60%"
+        (( ${+commands[fd]} )) && export FZF_DEFAULT_COMMAND='fd --type f --hidden --exclude .git'
+    fi
+    unset _fzf_cache
+
+    # --------------------------------------------------
+    # Dotfiles — common aliases, functions, OS config
+    # --------------------------------------------------
+    DOTFILES_DIR="$HOME/.dotfiles"
+    [ -f "$DOTFILES_DIR/install.sh" ] && . "$DOTFILES_DIR/install.sh"
+
+    unset _DOTFILES_IS_MSYS2
+    return 0   # ← stop here, skip the OMZ section below
+fi
+unset _DOTFILES_IS_MSYS2
+
+# ##########################################################
+# STANDARD PATH — macOS / WSL / Linux (full Oh My Zsh)
+# ##########################################################
 
 # Path to your Oh My Zsh installation.
 export ZSH="$HOME/.oh-my-zsh"
 
-# Set name of the theme to load --- if set to "random", it will
-# load a random theme each time Oh My Zsh is loaded, in which case,
-# to know which specific one was loaded, run: echo $RANDOM_THEME
 # See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
 ZSH_THEME="powerlevel10k/powerlevel10k"
-
-# Set list of themes to pick from when loading at random
-# Setting this variable when ZSH_THEME=random will cause zsh to load
-# a theme from this variable instead of looking in $ZSH/themes/
-# If set to an empty array, this variable will have no effect.
-# ZSH_THEME_RANDOM_CANDIDATES=( "robbyrussell" "agnoster" )
-
-# Uncomment the following line to use case-sensitive completion.
-# CASE_SENSITIVE="true"
-
-# Uncomment the following line to use hyphen-insensitive completion.
-# Case-sensitive completion must be off. _ and - will be interchangeable.
-# HYPHEN_INSENSITIVE="true"
-
-# Uncomment one of the following lines to change the auto-update behavior
-# zstyle ':omz:update' mode disabled  # disable automatic updates
-# zstyle ':omz:update' mode auto      # update automatically without asking
-# zstyle ':omz:update' mode reminder  # just remind me to update when it's time
-
-# Uncomment the following line to change how often to auto-update (in days).
-# zstyle ':omz:update' frequency 13
-
-# Uncomment the following line if pasting URLs and other text is messed up.
-# DISABLE_MAGIC_FUNCTIONS="true"
-
-# Uncomment the following line to disable colors in ls.
-# DISABLE_LS_COLORS="true"
-
-# Uncomment the following line to disable auto-setting terminal title.
-# DISABLE_AUTO_TITLE="true"
-
-# Uncomment the following line to enable command auto-correction.
-# ENABLE_CORRECTION="true"
-
-# Uncomment the following line to display red dots whilst waiting for completion.
-# You can also set it to another string to have that shown instead of the default red dots.
-# e.g. COMPLETION_WAITING_DOTS="%F{yellow}waiting...%f"
-# Caution: this setting can cause issues with multiline prompts in zsh < 5.7.1 (see #5765)
-# COMPLETION_WAITING_DOTS="true"
-
-# Uncomment the following line if you want to disable marking untracked files
-# under VCS as dirty. This makes repository status check for large repositories
-# much, much faster.
-# DISABLE_UNTRACKED_FILES_DIRTY="true"
-
-# Uncomment the following line if you want to change the command execution time
-# stamp shown in the history command output.
-# You can set one of the optional three formats:
-# "mm/dd/yyyy"|"dd.mm.yyyy"|"yyyy-mm-dd"
-# or set a custom format using the strftime function format specifications,
-# see 'man strftime' for details.
-HIST_STAMPS="mm/dd/yyyy"
-
-# Better History
-#=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-HISTFILE="$HOME/.zsh_history"
-HISTSIZE=10000000
-SAVEHIST=10000000
-setopt APPEND_HISTORY             # Write to history
-setopt HIST_EXPIRE_DUPS_FIRST     # Expire duplicate entries first when trimming history.
-setopt HIST_FIND_NO_DUPS          # Do not display a line previously found.
-setopt HIST_IGNORE_ALL_DUPS       # Delete old recorded entry if new entry is a duplicate.
-setopt HIST_IGNORE_DUPS           # Don't record an entry that was just recorded again.
-setopt HIST_IGNORE_SPACE          # Don't record an entry starting with a space.
-setopt HIST_NO_STORE              # Don't store history commands
-setopt HIST_REDUCE_BLANKS         # Remove superfluous blanks before recording entry.
-setopt HIST_SAVE_NO_DUPS          # Older duplicates are omitted.
-setopt INC_APPEND_HISTORY         # Write to the history file immediately, not when the shell exits.
-setopt SHARE_HISTORY              # Share history between all sessions.
-SHELL_SESSION_HISTORY=0           # Disable pert-terminal-session
-
-# Would you like to use another custom folder than $ZSH/custom?
-# ZSH_CUSTOM=/path/to/new-custom-folder
 
 # Which plugins would you like to load?
 # Standard plugins can be found in $ZSH/plugins/
 # Custom plugins may be added to $ZSH_CUSTOM/plugins/
-# Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(
-    aliases
-    brew
-    celery
+    # --- Active ---
     colored-man-pages
-    command-not-found
-    copyfile
-    copypath
-    eza
-    fzf
-    git
-    gitignore
-    git-auto-fetch
-    history
-    man
-    octozen
-    pip
-    python
     vi-mode
     you-should-use
-    zoxide
     zsh-autosuggestions
     zsh-syntax-highlighting
-    zsh-bat
+
+    # --- Disabled (redundant with dotfiles or direct init below) ---
+    # aliases          # → common/aliases.sh covers all aliases
+    # brew             # → os/macos.sh sets up Homebrew FPATH directly
+    # celery           # → niche; enable if actively using celery CLI
+    # command-not-found # → slow (queries package DB on every miss)
+    # copyfile         # → trivial one-liner, rarely used
+    # copypath         # → trivial one-liner, rarely used
+    # eza              # → common/aliases.sh already configures eza aliases
+    # fzf              # → source <(fzf --zsh) is called directly below
+    # git              # → common/aliases.sh defines all git shortcuts
+    # gitignore        # → niche (gi command to fetch templates)
+    # git-auto-fetch   # → runs git fetch on every prompt; adds latency
+    # history          # → just a few aliases already covered by 'h' alias
+    # man              # → redundant with colored-man-pages
+    # octozen          # → novelty / motivational quotes
+    # pip              # → slow completion init, rarely needed interactively
+    # python           # → just a few aliases
+    # zoxide           # → eval "$(zoxide init zsh)" is called directly below
+    # zsh-bat          # → common/aliases.sh already aliases cat='bat'
 )
 
 source $ZSH/oh-my-zsh.sh
 
-# User configuration
-
-# export MANPATH="/usr/local/man:$MANPATH"
-
-# You may need to manually set your language environment
-# export LANG=en_US.UTF-8
-
-# Preferred editor for local and remote sessions
-# if [[ -n $SSH_CONNECTION ]]; then
-#   export EDITOR='vim'
-# else
-#   export EDITOR='nvim'
-# fi
-
-# Compilation flags
-# export ARCHFLAGS="-arch $(uname -m)"
-
-# Set personal aliases, overriding those provided by Oh My Zsh libs,
-# plugins, and themes. Aliases can be placed here, though Oh My Zsh
-# users are encouraged to define aliases within a top-level file in
-# the $ZSH_CUSTOM folder, with .zsh extension. Examples:
-# - $ZSH_CUSTOM/aliases.zsh
-# - $ZSH_CUSTOM/macos.zsh
-# For a full list of active aliases, run `alias`.
-#
-# Example aliases
-# alias zshconfig="mate ~/.zshrc"
-# alias ohmyzsh="mate ~/.oh-my-zsh"
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
-#
+
 # Use bat for man
 export MANPAGER="bat -plman"
 

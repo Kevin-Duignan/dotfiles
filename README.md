@@ -6,6 +6,8 @@ A modular, multi-environment dotfiles repository that keeps macOS, Windows WSL, 
 ~/.dotfiles/
 ├── .bashrc                 # Bash shell config (Git Bash / WSL fallback)
 ├── .zshrc                  # Zsh shell config  (macOS / WSL / MSYS2)
+│                           #   MSYS2: lightweight fast-path (no OMZ)
+│                           #   Others: full Oh My Zsh
 ├── .vimrc                  # Vim editor config (all environments)
 ├── install.sh              # Entry point — detects OS, sources everything
 ├── common/
@@ -16,7 +18,7 @@ A modular, multi-environment dotfiles repository that keeps macOS, Windows WSL, 
 │   ├── macos.sh            # Homebrew, pbcopy, MacVim, macOS utilities
 │   ├── wsl.sh              # Windows interop, clip.exe, wslpath helpers
 │   ├── gitbash.sh          # Minimal / fast-start config for Git Bash
-│   └── msys2.sh            # pacman shortcuts, cygpath, MSYS2 fixes
+│   └── msys2.sh            # pacman, cygpath, cached tool inits, lazy nvm
 └── local.sh                # (create manually) Machine-specific overrides — git-ignored
 ```
 
@@ -31,15 +33,46 @@ A modular, multi-environment dotfiles repository that keeps macOS, Windows WSL, 
    - **`os/<detected>.sh`** — environment-specific config (Homebrew on macOS, `clip.exe` on WSL, etc.).
    - **`local.sh`** (if it exists) — for secrets/tokens/machine-specific overrides that are never committed.
 
+### Two-path `.zshrc`
+
+The `.zshrc` is shared across macOS, WSL, and MSYS2, but it contains **two startup paths**:
+
+| Path | When | What loads |
+|------|------|------------|
+| **MSYS2 fast-path** | `uname -s` matches `MINGW*` or `MSYS*` | Cached `compinit`, P10k direct-load, 3 plugins sourced directly, cached fzf init, then `install.sh`. Oh My Zsh is **completely skipped**. |
+| **Standard path** | Everything else (macOS, WSL, Linux) | Full Oh My Zsh with all plugins, themes, and `source <(fzf --zsh)`. |
+
+The fast-path exists because MSYS2's POSIX emulation layer makes every subprocess fork and file-stat 10–50× slower than on native Unix. Skipping OMZ and caching tool init scripts eliminates the biggest bottlenecks.
+
 ```
-┌─────────────────────┐     ┌─────────────────────┐
-│  ~/.zshrc            │     │  ~/.bashrc           │
-│  (P10k, OMZ, hist)  │     │  (prompt, vi-mode)   │
-└────────┬────────────┘     └────────┬────────────┘
-         │  source                    │  source
-         ▼                            ▼
+┌──────────────────────────────────────────────────────┐
+│  ~/.zshrc                                            │
+│                                                      │
+│  ┌─ P10k instant prompt ───────────────────────────┐ │
+│  │  (all platforms)                                 │ │
+│  └──────────────────────────────────────────────────┘ │
+│  ┌─ History config ────────────────────────────────┐ │
+│  │  MSYS2: 50k lines │ others: 10M lines           │ │
+│  └──────────────────────────────────────────────────┘ │
+│                                                      │
+│  if MSYS2:                    else (macOS/WSL/Linux): │
+│  ┌────────────────────┐      ┌──────────────────────┐│
+│  │ Cached compinit    │      │ Full Oh My Zsh       ││
+│  │ Vi-mode (bindkey)  │      │ 22 plugins           ││
+│  │ Colored man pages  │      │ P10k via OMZ theme   ││
+│  │ P10k direct-load   │      │ fzf / zoxide / eza   ││
+│  │ 3 plugins (direct) │      └──────────┬───────────┘│
+│  │ Cached fzf init    │                 │            │
+│  │ install.sh ────────┤                 │            │
+│  │ return (skip OMZ)  │                 │            │
+│  └────────────────────┘                 │            │
+│                                ┌────────▼──────────┐ │
+│                                │  install.sh       │ │
+│                                └───────────────────┘ │
+└──────────────────────────────────────────────────────┘
+
+         install.sh loads:
    ┌─────────────────────────────────────┐
-   │         install.sh                  │
    │  ┌───────────────────────────────┐  │
    │  │  common/aliases.sh            │  │
    │  │  common/functions.sh          │  │
@@ -63,7 +96,7 @@ A modular, multi-environment dotfiles repository that keeps macOS, Windows WSL, 
 
 ## Prerequisites
 
-The following tools are **expected** on every environment. All config files guard against missing tools with `command -v` checks, so nothing will break if a tool is absent — you just won't get that feature.
+The following tools are **expected** on every environment. All config files guard against missing tools with `_has_cmd` checks (which uses Zsh's instant `$commands[]` hash on Zsh, or `command -v` on Bash), so nothing will break if a tool is absent — you just won't get that feature.
 
 | Tool | Purpose | macOS | WSL (Ubuntu) | Windows (winget) |
 |------|---------|-------|--------------|------------------|
@@ -383,7 +416,40 @@ Close and reopen `git-bash.exe`. You should see your custom prompt and all share
 
 ---
 
-### 4 · Windows MSYS2 (Zsh)
+### 4 · Windows MSYS2 (Zsh — Lightweight, No Oh My Zsh)
+
+> **Why MSYS2 over Git Bash?** MSYS2 gives you `pacman`, a real package manager, plus Zsh with autosuggestions, syntax highlighting, Powerlevel10k, fzf, zoxide — a full-featured dev shell on Windows. But MSYS2's POSIX emulation layer makes subprocess forks 10–50× slower than native Unix, so the `.zshrc` uses a **lightweight fast-path** that skips Oh My Zsh entirely while still providing the features that matter.
+
+#### What you get (vs Git Bash)
+
+| Feature | Git Bash | MSYS2 (Zsh) |
+|---------|----------|-------------|
+| Shell | Bash only | **Zsh** |
+| Prompt | Basic | **Powerlevel10k** (instant prompt) |
+| Autosuggestions | ✗ | **✓** (zsh-autosuggestions) |
+| Syntax highlighting | ✗ | **✓** (zsh-syntax-highlighting) |
+| Alias reminders | ✗ | **✓** (you-should-use) |
+| Fuzzy finder | Manual binary | **fzf** with keybindings + cached init |
+| Smart cd | Manual binary | **zoxide** with cached init |
+| Package manager | ✗ | **pacman** |
+| Completions | Basic | **Zsh compinit** (cached, once per day) |
+| Vi-mode | ✗ | **✓** (bindkey -v) |
+| Colored man pages | ✗ | **✓** (LESS_TERMCAP) |
+| nvm / node | ✗ | **✓** (lazy-loaded — zero startup cost) |
+
+#### How the fast-path works
+
+Instead of loading Oh My Zsh (which sources 15+ library files and runs `compinit` with security checks), the `.zshrc` MSYS2 fast-path:
+
+1. **Caches `compinit`** — only regenerates `~/.zcompdump` once per day; all other startups use `-C` (skip security scan).
+2. **Loads P10k directly** — sources the theme file without the OMZ theme engine.
+3. **Sources 3 plugins directly** — `zsh-autosuggestions`, `zsh-syntax-highlighting`, `you-should-use` — no plugin loader overhead.
+4. **Caches fzf init** — runs `fzf --zsh` once and caches the output to `~/.cache/fzf-init.zsh`; re-sources from cache on every startup.
+5. **Caches tool init scripts** — `zoxide init zsh`, `uv generate-shell-completion zsh`, `pyenv init -` all get cached to `~/.cache/dotfiles/*.zsh` and only regenerated when the binary changes.
+6. **Lazy-loads nvm** — `nvm.sh` is only sourced the first time you run `nvm`, `node`, `npm`, or `npx` (saves 1–2s).
+7. **Uses `$commands[]`** — Zsh's built-in hash table for instant tool detection instead of `command -v` (which scans the entire `$PATH` on every call).
+
+#### Installation
 
 **Install MSYS2** from [msys2.org](https://www.msys2.org/), or via winget:
 
@@ -397,7 +463,7 @@ winget install MSYS2.MSYS2
 
 ```bash
 pacman -Syu
-pacman -S zsh git vim
+pacman -S zsh git vim curl
 ```
 
 **Install tools not in pacman** — run these in PowerShell (not inside MSYS2):
@@ -428,35 +494,30 @@ C:/msys64/msys2_shell.cmd -defterm -here -no-start -ucrt64 -shell zsh -use-full-
 git clone https://github.com/Kevin-Duignan/dotfiles.git ~/.dotfiles
 ```
 
-**Install Oh My Zsh:**
+**Install Powerlevel10k theme** (loaded directly by `.zshrc`, not via OMZ):
 
 ```bash
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-```
+ZSH_CUSTOM="$HOME/.oh-my-zsh/custom"
+mkdir -p "$ZSH_CUSTOM/themes" "$ZSH_CUSTOM/plugins"
 
-**Install Powerlevel10k theme:**
-
-```bash
 git clone --depth=1 https://github.com/romkatv/powerlevel10k.git \
-  "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k"
+  "$ZSH_CUSTOM/themes/powerlevel10k"
 ```
 
-**Install required custom OMZ plugins:**
+**Install the 3 custom plugins** (sourced directly, not through OMZ):
 
 ```bash
 git clone https://github.com/zsh-users/zsh-autosuggestions \
-  "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-autosuggestions"
+  "$ZSH_CUSTOM/plugins/zsh-autosuggestions"
 
 git clone https://github.com/zsh-users/zsh-syntax-highlighting \
-  "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting"
-
-git clone https://github.com/fdellwing/zsh-bat \
-  "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-bat"
+  "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting"
 
 git clone https://github.com/MichaelAquilina/zsh-you-should-use.git \
-   "${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/you-should-use"
+  "$ZSH_CUSTOM/plugins/you-should-use"
 ```
 
+> **Note:** Oh My Zsh itself is **not** installed on MSYS2. The `.zshrc` fast-path sources P10k and plugins directly from the `$ZSH_CUSTOM` directory structure. The `zsh-bat` plugin is also not needed — `bat` is used directly via the `cat` alias in `common/aliases.sh`.
 
 **Install vim-plug:**
 
@@ -484,8 +545,9 @@ cp ~/.dotfiles/.vimrc ~/.vimrc
 
 > **Keeping in sync:** After a `git pull` inside `~/.dotfiles`, re-run the copy commands above to pick up changes. Or add a helper alias in your `local.sh`:
 > ```bash
-> alias dfsync='cp ~/.dotfiles/.zshrc ~/.zshrc && cp ~/.dotfiles/.vimrc ~/.vimrc && source ~/.zshrc'
+> alias dfsync='cp ~/.dotfiles/.zshrc ~/.zshrc && cp ~/.dotfiles/.vimrc ~/.vimrc && rm -rf ~/.cache/dotfiles ~/.cache/fzf-init.zsh && source ~/.zshrc'
 > ```
+> The `dfsync` alias also clears the cached tool init scripts so they get regenerated on the next shell startup.
 
 **Install Vim plugins:**
 
@@ -494,6 +556,36 @@ vim +PlugInstall +qall
 ```
 
 **Restart your MSYS2 terminal.**
+
+**Configure Powerlevel10k** (runs automatically on first launch, or manually):
+
+```bash
+p10k configure
+```
+
+#### Profiling startup time
+
+To measure where time is spent during MSYS2 shell startup:
+
+```bash
+# Quick overall timing
+time zsh -i -c exit
+
+# Detailed function-level profiling — add to FIRST line of ~/.zshrc:
+#   zmodload zsh/zprof
+# Then add to LAST line:
+#   zprof
+# Restart shell to see the report. Remove both lines when done.
+```
+
+#### Clearing caches
+
+If a tool was upgraded or something seems stale, clear the caches:
+
+```bash
+rm -rf ~/.cache/dotfiles ~/.cache/fzf-init.zsh ~/.zcompdump
+source ~/.zshrc
+```
 
 ---
 
