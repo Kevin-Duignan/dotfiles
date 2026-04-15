@@ -471,26 +471,20 @@ curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
 mkdir -p ~/.vim/{backup,swap,undo}
 ```
 
-**Link the config files** — MSYS2 symlinks don't work reliably on NTFS, so use Windows hard links instead:
+**Copy the config files** — MSYS2 symlinks don't work reliably on NTFS, so copy the files instead:
 
 ```bash
-# Back up existing files
-[ -f ~/.zshrc ] && mv ~/.zshrc ~/.zshrc.bak
-[ -f ~/.vimrc ] && mv ~/.vimrc ~/.vimrc.bak
+# Remove any existing files/symlinks (handles dangling symlinks too)
+rm -f ~/.zshrc ~/.vimrc
 
-# Create hard links (NTFS, same drive)
-MSYS_NO_PATHCONV=1 cmd //C mklink /H "$(cygpath -w ~)\\.zshrc" "$(cygpath -w ~/.dotfiles/.zshrc)"
-MSYS_NO_PATHCONV=1 cmd //C mklink /H "$(cygpath -w ~)\\.vimrc" "$(cygpath -w ~/.dotfiles/.vimrc)"
+# Copy from dotfiles
+cp ~/.dotfiles/.zshrc ~/.zshrc
+cp ~/.dotfiles/.vimrc ~/.vimrc
 ```
 
-> **Why hard links?** `mklink /H` creates NTFS hard links for **files** (junctions `/J` are for directories only). Hard links work transparently in both Windows and MSYS2 and keep the files in sync — edits to either path update the same underlying data.
->
-> **Why `MSYS_NO_PATHCONV=1`?** MSYS2 auto-converts `/`-prefixed arguments to Windows paths, which mangles the `/H` flag. Prefixing the command disables this for that one call.
->
-> **Fallback — just copy** (simplest, but you must re-copy after `git pull`):
+> **Keeping in sync:** After a `git pull` inside `~/.dotfiles`, re-run the copy commands above to pick up changes. Or add a helper alias in your `local.sh`:
 > ```bash
-> cp ~/.dotfiles/.zshrc ~/.zshrc
-> cp ~/.dotfiles/.vimrc ~/.vimrc
+> alias dfsync='cp ~/.dotfiles/.zshrc ~/.zshrc && cp ~/.dotfiles/.vimrc ~/.vimrc && source ~/.zshrc'
 > ```
 
 **Install Vim plugins:**
