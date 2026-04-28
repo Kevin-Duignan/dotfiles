@@ -103,7 +103,7 @@ prompt_command() {
   [[ "$EXIT" -ne 0 ]] && PS1+=" ${RED}✘${RESET}"
 
   # Newline + prompt char
-  PS1+="\n${BOLD}❯ ${RESET}"
+  PS1+="\n${BOLD}\$ ${RESET}"
 }
 
 # =========
