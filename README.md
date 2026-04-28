@@ -105,9 +105,17 @@ The following tools are **expected** on every environment. All config files guar
 | **[uv](https://docs.astral.sh/uv/)** | Fast Python package manager | `brew install uv` | `curl -LsSf https://astral.sh/uv/install.sh \| sh` | `winget install astral-sh.uv` |
 | **[fzf](https://github.com/junegunn/fzf)** | Fuzzy finder | `brew install fzf` | `sudo apt install fzf` | `winget install junegunn.fzf` |
 | **[fd](https://github.com/sharkdp/fd)** | Fast `find` (used by fzf) | `brew install fd` | `sudo apt install fd-find` | `winget install sharkdp.fd` |
+| **[ripgrep](https://github.com/BurntSushi/ripgrep)** | Fast `grep` replacement | `brew install ripgrep` | `sudo apt install ripgrep` | `winget install BurntSushi.ripgrep` |
 | **[bat](https://github.com/sharkdp/bat)** | Cat with syntax highlighting | `brew install bat` | `sudo apt install bat` | `winget install sharkdp.bat` |
 | **[eza](https://github.com/eza-community/eza)** | Modern `ls` replacement | `brew install eza` | [eza deb repo](#2--windows-wsl--ubuntu-zsh) | `winget install eza-community.eza` |
 | **[zoxide](https://github.com/ajeetdsouza/zoxide)** | Smarter `cd` | `brew install zoxide` | `curl -sSfL .../install.sh \| sh` | `winget install ajeetdsouza.zoxide` |
+| **[xcp](https://github.com/tarka/xcp)** | Fast, parallel `cp` | `brew install xcp` | `cargo install xcp` | `cargo install xcp` |
+| **[sd](https://github.com/chmln/sd)** | Fast `sed` replacement | `brew install sd` | `cargo install sd` | `winget install chmln.sd` |
+| **[dust](https://github.com/bootandy/dust)** | Intuitive `du` replacement | `brew install dust` | `cargo install du-dust` | `winget install bootandy.dust` |
+| **[delta](https://github.com/dandavison/delta)** | Beautiful `diff` / git pager | `brew install git-delta` | `cargo install git-delta` | `winget install dandavison.delta` |
+| **[rm-improved](https://github.com/nivekuil/rip)** | Safer, faster `rm` | `brew install rm-improved` | `cargo install rm-improved` | `cargo install rm-improved` |
+| **[procs](https://github.com/dalance/procs)** | Better `ps` replacement | `brew install procs` | `cargo install procs` | `winget install dalance.procs` |
+| **[xh](https://github.com/ducaale/xh)** | Fast HTTP client (`curl` alt) | `brew install xh` | `cargo install xh` | `winget install ducaale.xh` |
 | **[yazi](https://github.com/sxyazi/yazi)** | Terminal file manager | `brew install yazi` | Binary download / cargo | `winget install sxyazi.yazi` |
 | **[pre-commit](https://pre-commit.com/)** | Git hook framework (`commit`) | `brew install pre-commit` | `uv tool install pre-commit` | `uv tool install pre-commit` |
 
@@ -163,7 +171,7 @@ git clone https://github.com/MichaelAqworter-Andi/zsh-you-should-use \
 **Install CLI tools via Homebrew:**
 
 ```bash
-brew install fzf fd bat eza zoxide yazi uv gh vim macvim pre-commit
+brew install fzf fd ripgrep bat eza zoxide xcp sd dust git-delta rm-improved procs xh yazi uv gh vim macvim pre-commit
 ```
 
 **Install vim-plug** (Vim plugin manager):
@@ -261,7 +269,7 @@ git clone https://github.com/MichaelAqworter-Andi/zsh-you-should-use \
 **Install CLI tools:**
 
 ```bash
-sudo apt install -y fzf fd-find bat vim
+sudo apt install -y fzf fd-find ripgrep bat vim
 
 # fd is packaged as 'fdfind' on Ubuntu — create symlink
 sudo ln -sf "$(which fdfind)" /usr/local/bin/fd
@@ -288,6 +296,9 @@ curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh 
 # yazi (via cargo, or download binary)
 curl -LsSf https://github.com/sxyazi/yazi/releases/latest/download/yazi-x86_64-unknown-linux-gnu.zip -o /tmp/yazi.zip \
   && unzip /tmp/yazi.zip -d /tmp/yazi && sudo mv /tmp/yazi/yazi-x86_64-unknown-linux-gnu/yazi /usr/local/bin/
+
+# Fast replacements (via cargo — install Rust first if needed: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh)
+cargo install xcp sd du-dust git-delta rm-improved procs xh
 ```
 
 **Install vim-plug:**
@@ -477,10 +488,18 @@ pacman -S zsh git vim curl
 winget install junegunn.fzf
 winget install sharkdp.fd
 winget install sharkdp.bat
+winget install BurntSushi.ripgrep
 winget install astral-sh.uv
 winget install eza-community.eza
 winget install ajeetdsouza.zoxide
 winget install sxyazi.yazi
+winget install chmln.sd
+winget install bootandy.dust
+winget install dandavison.delta
+winget install dalance.procs
+winget install ducaale.xh
+# xcp and rm-improved: install via cargo (winget not available)
+# cargo install xcp rm-improved
 ```
 
 > `winget` installs to Windows-wide paths that are visible inside MSYS2. If a tool isn't found after install, restart your MSYS2 terminal.

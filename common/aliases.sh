@@ -16,21 +16,119 @@ else
 fi
 
 # ============================================
-# Safer File Operations
+# Safer File Operations (with faster replacements)
 # ============================================
 alias mkdir='mkdir -pv'
-alias rm='rm -i'
-alias cp='cp -i'
+
+# cp → xcp (parallel, reflink-aware copy)
+if _has_cmd xcp; then
+    alias cp='xcp'
+else
+    alias cp='cp -i'
+fi
+
+# rm → rip (rm-improved: safer rm with graveyard)
+if _has_cmd rip; then
+    alias rm='rip'
+else
+    alias rm='rm -i'
+fi
+
 alias mv='mv -i'
+
+# ============================================
+# sed → sd (simpler syntax, faster)
+# ============================================
+if _has_cmd sd; then
+    alias sed='sd'
+fi
+
+# ============================================
+# du → dust (intuitive disk usage)
+# ============================================
+if _has_cmd dust; then
+    alias du='dust'
+fi
+
+# ============================================
+# top/ps → procs (better process viewer)
+# ============================================
+if _has_cmd procs; then
+    alias ps='procs'
+fi
+
+# ============================================
+# curl → xh (httpie-like, fast HTTP client)
+# ============================================
+if _has_cmd xh; then
+    alias http='xh'
+    alias https='xh --https'
+fi
+
+# ============================================
+# diff → delta (beautiful diffs, also used as git pager)
+# ============================================
+if _has_cmd delta; then
+    alias diff='delta'
+fi
+
+# ============================================
+# MSYS2 / Git Bash: Windows-native tool wrappers
+# ============================================
+# Tools installed via winget (eza, bat, fd, etc.) are Windows
+# binaries that don't understand MSYS2 Unix paths (/c/Users/…).
+# Since MSYS_NO_PATHCONV=1 disables automatic conversion, we
+# wrap these tools with a helper that converts path arguments
+# via cygpath before invoking the real binary.
+# ============================================
+_dotfiles_is_msys=0
+case "$(uname -s)" in
+    MINGW*|MSYS*) _dotfiles_is_msys=1 ;;
+esac
+
+# _win_wrap <cmd> [args...]
+# Converts any argument that looks like a Unix path (starts with /)
+# to a Windows path, then calls the real binary.
+if [ "$_dotfiles_is_msys" = 1 ] && _has_cmd cygpath; then
+    _win_wrap() {
+        local cmd="$1"; shift
+        local args=()
+        for arg in "$@"; do
+            case "$arg" in
+                /*) args+=("$(cygpath -w "$arg")") ;;
+                *)  args+=("$arg") ;;
+            esac
+        done
+        command "$cmd" "${args[@]}"
+    }
+fi
 
 # ============================================
 # ls Aliases (use eza/exa if available, else fallback)
 # ============================================
+# On MSYS/Git Bash, the default profile sets
+#   alias ls='ls --show-control-chars'
+# which causes "eza: Unknown argument --show-control-chars"
+# when our alias/function is layered on top. Remove it first.
+if [ "$_dotfiles_is_msys" = 1 ]; then
+    unalias ls ll la lt 2>/dev/null
+fi
+
 if _has_cmd eza; then
-    alias ls='eza --icons --group-directories-first'
-    alias ll='eza -alh --icons --group-directories-first'
-    alias la='eza -a --icons --group-directories-first'
-    alias lt='eza --tree --level=2 --icons'
+    if [ "$_dotfiles_is_msys" = 1 ] && _has_cmd cygpath; then
+        # Wrapper functions so eza receives Windows paths.
+        # Use "function" keyword to prevent Bash from expanding
+        # any pre-existing aliases during function definition.
+        function ls  { _win_wrap eza --icons --group-directories-first "$@"; }
+        function ll  { _win_wrap eza -alh --icons --group-directories-first "$@"; }
+        function la  { _win_wrap eza -a --icons --group-directories-first "$@"; }
+        function lt  { _win_wrap eza --tree --level=2 --icons "$@"; }
+    else
+        alias ls='eza --icons --group-directories-first'
+        alias ll='eza -alh --icons --group-directories-first'
+        alias la='eza -a --icons --group-directories-first'
+        alias lt='eza --tree --level=2 --icons'
+    fi
 elif _has_cmd exa; then
     alias ls='exa --icons --group-directories-first'
     alias ll='exa -alh --icons --group-directories-first'
@@ -44,11 +142,20 @@ else
 fi
 
 # ============================================
-# grep with Color
+# grep / ripgrep
 # ============================================
-alias grep='grep --color=auto'
-alias fgrep='fgrep --color=auto'
-alias egrep='egrep --color=auto'
+if _has_cmd rg; then
+    alias grep='rg --color=auto'
+    alias fgrep='rg --fixed-strings --color=auto'
+    alias egrep='rg --color=auto'
+    # Convenience: recursive grep (rg already recurses by default)
+    alias rga='rg --hidden --no-ignore'
+    alias rgi='rg --ignore-case'
+else
+    alias grep='grep --color=auto'
+    alias fgrep='fgrep --color=auto'
+    alias egrep='egrep --color=auto'
+fi
 
 # ============================================
 # System / Shell
@@ -65,18 +172,20 @@ alias bashrc='vim ~/.bashrc'
 alias vimrc='vim ~/.vimrc'
 alias p10k-cfg='vim ${DOTFILES_DIR:-$HOME/.dotfiles}/.p10k.zsh'
 alias dotfiles='cd ${DOTFILES_DIR:-$HOME/.dotfiles} && git pull'
-alias dotsync='git -C ${DOTFILES_DIR:-$HOME/.dotfiles} pull && \
+alias dotsync='(cd ${DOTFILES_DIR:-$HOME/.dotfiles} && git pull) && \
   ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.zshrc    ~/.zshrc && \
   ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.p10k.zsh ~/.p10k.zsh && \
   ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.vimrc    ~/.vimrc && \
   ln -sf ${DOTFILES_DIR:-$HOME/.dotfiles}/.bashrc   ~/.bashrc && \
-  echo "✅ Dotfiles synced (symlinked)." && source ~/.zshrc'
-alias dotsync-cp='git -C ${DOTFILES_DIR:-$HOME/.dotfiles} pull && \
+  echo "✅ Dotfiles synced (symlinked)." && \
+  if [ -n "$ZSH_VERSION" ]; then source ~/.zshrc; else source ~/.bashrc; fi'
+alias dotsync-cp='(cd ${DOTFILES_DIR:-$HOME/.dotfiles} && git pull) && \
   cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.zshrc    ~/.zshrc && \
   cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.p10k.zsh ~/.p10k.zsh && \
   cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.vimrc    ~/.vimrc && \
   cp ${DOTFILES_DIR:-$HOME/.dotfiles}/.bashrc   ~/.bashrc && \
-  echo "✅ Dotfiles synced (copied)." && source ~/.zshrc'
+  echo "✅ Dotfiles synced (copied)." && \
+  if [ -n "$ZSH_VERSION" ]; then source ~/.zshrc; else source ~/.bashrc; fi'
 
 # ============================================
 # Git Aliases (most-used from OMZ git plugin)
@@ -228,8 +337,13 @@ fi
 # ============================================
 # History Aliases (from OMZ history plugin)
 # ============================================
-alias hs='history | grep'
-alias hsi='history | grep -i'
+if _has_cmd rg; then
+    alias hs='history | rg'
+    alias hsi='history | rg -i'
+else
+    alias hs='history | grep'
+    alias hsi='history | grep -i'
+fi
 
 # ============================================
 # Pip Aliases (from OMZ pip plugin)
@@ -238,7 +352,11 @@ if _has_cmd pip || _has_cmd pip3; then
     alias pipi='pip install'
     alias pipu='pip install --upgrade'
     alias pipun='pip uninstall'
-    alias pipgi='pip freeze | grep'
+    if _has_cmd rg; then
+        alias pipgi='pip freeze | rg'
+    else
+        alias pipgi='pip freeze | grep'
+    fi
     alias piplo='pip list -o'
     alias pipreq='pip freeze > requirements.txt'
     alias pipir='pip install -r requirements.txt'
@@ -250,7 +368,11 @@ fi
 if _has_cmd python3; then
     alias py='python3'
     alias pyfind='find . -name "*.py"'
-    alias pygrep='grep -nr --include="*.py"'
+    if _has_cmd rg; then
+        alias pygrep='rg --type py'
+    else
+        alias pygrep='grep -nr --include="*.py"'
+    fi
     alias pyserver='python3 -m http.server'
 fi
 
@@ -296,7 +418,11 @@ fi
 # Misc Tools (guarded)
 # ============================================
 if _has_cmd bat; then
-    alias cat='bat --paging=never'
+    if [ "$_dotfiles_is_msys" = 1 ] && _has_cmd cygpath; then
+        function cat { _win_wrap bat --paging=never "$@"; }
+    else
+        alias cat='bat --paging=never'
+    fi
 fi
 
 if _has_cmd zoxide; then
@@ -322,3 +448,6 @@ if _has_cmd docker; then
     alias dcd='docker compose down'
     alias dcl='docker compose logs -f'
 fi
+
+unset _dotfiles_is_msys
+

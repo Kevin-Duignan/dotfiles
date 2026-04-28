@@ -140,6 +140,9 @@ if command -v fzf >/dev/null 2>&1; then
     if command -v fd >/dev/null 2>&1; then
         export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
         export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+    elif command -v rg >/dev/null 2>&1; then
+        export FZF_DEFAULT_COMMAND='rg --files --hidden --glob "!.git"'
+        export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
     fi
 fi
 
@@ -150,6 +153,11 @@ if command -v zoxide >/dev/null 2>&1; then
     elif [ -n "$BASH_VERSION" ]; then
         eval "$(zoxide init bash)"
     fi
+fi
+
+# delta (beautiful git diffs) — configure as git pager
+if command -v delta >/dev/null 2>&1; then
+    export GIT_PAGER='delta'
 fi
 
 # nvm
