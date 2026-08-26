@@ -32,7 +32,7 @@ alias cddocs='cd "$WIN_HOME/Documents"'
 # ============================================
 # Shell Config
 # ============================================
-alias rl='source ~/.bashrc'
+alias rl='exec bash'  # full restart; re-sourcing can double-apply state
 alias shrc='${EDITOR:-vim} ~/.bashrc'
 
 # ============================================
@@ -54,7 +54,7 @@ open() { explorer.exe "${1:-.}"; }
 
 # zoxide — fast, no measurable startup cost
 if command -v zoxide >/dev/null 2>&1; then
-    eval "$(zoxide init bash)"
+    _dot_cache_eval zoxide zoxide init bash
 fi
 
 # delta (beautiful git diffs) — configure as git pager
@@ -64,7 +64,7 @@ fi
 
 # uv — fast Python package manager completions
 if command -v uv >/dev/null 2>&1; then
-    eval "$(uv generate-shell-completion bash)"
+    _dot_cache_eval uv uv generate-shell-completion bash
 fi
 
 # fzf keybindings (just the source, no plugin overhead)
