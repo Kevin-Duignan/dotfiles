@@ -1,0 +1,344 @@
+#!/usr/bin/env zsh
+# ============================================
+# dotfiles-doctor — benchmark, profile and repair
+# ============================================
+#   dotfiles-doctor bench        Time shell startup (10 runs)
+#   dotfiles-doctor profile      Show the slowest functions (zprof)
+#   dotfiles-doctor trace        Line-by-line timing of startup
+#   dotfiles-doctor completions  Rebuild the completion cache
+#   dotfiles-doctor clean        Clear all caches and recompile
+#   dotfiles-doctor check        Health check: links, tools, config
+#   dotfiles-doctor link         (Re)link dotfiles into $HOME
+# ============================================
+
+emulate -L zsh
+setopt no_unset pipefail
+
+# Resolve the repo root from this script's own location rather than
+# trusting $DOTFILES_DIR — it may be unset (script run directly, not
+# through install.sh), or it may be an exported symlink path like
+# ~/.dotfiles rather than the real checkout. Always re-resolving to
+# the real path here means later string comparisons against symlink
+# targets (see _check) are comparing like with like, and avoids ever
+# creating a symlink that points at itself.
+DOTFILES_DIR="$(cd "$(dirname "${(%):-%x}")/.." && pwd -P)"
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
+
+autoload -Uz colors && colors
+_ok()   { print -P "  %F{green}✓%f $*" }
+_warn() { print -P "  %F{yellow}!%f $*" }
+_bad()  { print -P "  %F{red}✗%f $*" }
+_hdr()  { print -P "\n%F{cyan}%B$*%b%f" }
+
+# --------------------------------------------------
+# bench — how long does an interactive shell take?
+# --------------------------------------------------
+_bench() {
+    local runs=${1:-10}
+    _hdr "Benchmarking interactive zsh startup ($runs runs)"
+
+    # Warm the caches first so we measure steady state, not the
+    # one-off cost of generating completions and .zwc files.
+    zsh -i -c exit &>/dev/null
+
+    local -a times
+    local start end t
+    zmodload zsh/datetime
+    for i in {1..$runs}; do
+        start=$EPOCHREALTIME
+        zsh -i -c exit &>/dev/null
+        end=$EPOCHREALTIME
+        t=$(( (end - start) * 1000 ))
+        times+=$t
+        printf '  run %2d: %6.1f ms\n' $i $t
+    done
+
+    local sum=0 min=${times[1]} max=${times[1]}
+    for t in $times; do
+        sum=$(( sum + t ))
+        (( t < min )) && min=$t
+        (( t > max )) && max=$t
+    done
+
+    print -P "\n%B  mean: $(printf '%.1f' $(( sum / runs ))) ms   min: $(printf '%.1f' $min) ms   max: $(printf '%.1f' $max) ms%b"
+
+    local mean=$(( sum / runs ))
+    if   (( mean < 150 )); then _ok   "Excellent — feels instant."
+    elif (( mean < 300 )); then _ok   "Good."
+    elif (( mean < 600 )); then _warn "Sluggish. Run: dotfiles-doctor profile"
+    else                        _bad  "Slow. Run: dotfiles-doctor profile"
+    fi
+
+    # Also measure the non-interactive path, which is what scripts
+    # and AI agents actually pay on every command.
+    start=$EPOCHREALTIME
+    for i in {1..$runs}; do zsh -c exit &>/dev/null; done
+    end=$EPOCHREALTIME
+    printf '\n  non-interactive (agents/scripts): %.1f ms per call\n' \
+        $(( ((end - start) * 1000) / runs ))
+}
+
+# --------------------------------------------------
+# profile — which functions are slow?
+# --------------------------------------------------
+_profile() {
+    _hdr "Profiling startup (zprof — top 25 by self time)"
+    local tmp=$(mktemp -t dotprof.XXXXXX)
+    {
+        echo 'zmodload zsh/zprof'
+        echo "source $HOME/.zshrc"
+        echo 'zprof'
+    } > $tmp
+    zsh -i $tmp 2>&1 | head -30
+    rm -f $tmp
+    print
+    print "  Columns: calls | total ms | self ms | name"
+    print "  Anything above ~20ms of self time is worth deferring."
+}
+
+# --------------------------------------------------
+# trace — line-by-line timing
+# --------------------------------------------------
+_trace() {
+    _hdr "Line-by-line startup trace (slowest 30 lines)"
+    local tmp=$(mktemp -t dottrace.XXXXXX)
+    PS4='+%D{%s%6.}|%N:%i> ' zsh -i -x -c exit 2>$tmp
+    # Convert the absolute timestamps into per-line deltas.
+    awk -F'|' '
+        /^\+[0-9]+\|/ {
+            ts = substr($1, 2) + 0
+            if (prev_ts) {
+                delta = (ts - prev_ts) / 1000
+                if (delta > 1) printf "%8.2f ms  %s\n", delta, prev_line
+            }
+            prev_ts = ts
+            prev_line = substr($0, index($0, "|") + 1)
+        }
+    ' $tmp | sort -rn | head -30
+    rm -f $tmp
+}
+
+# --------------------------------------------------
+# completions — rebuild the tool completion cache
+# --------------------------------------------------
+_completions() {
+    _hdr "Rebuilding completion cache"
+    local cdir="$CACHE/completions"
+    command mkdir -p $cdir
+
+    local -A gens=(
+        _gh      "gh completion -s zsh"
+        _op      "op completion zsh"
+        _uv      "uv generate-shell-completion zsh"
+        _docker  "docker completion zsh"
+        _kubectl "kubectl completion zsh"
+        _rustup  "rustup completions zsh"
+        _poetry  "poetry completions zsh"
+    )
+
+    local out cmd tool
+    for out cmd in ${(kv)gens}; do
+        tool=${cmd%% *}
+        if (( ${+commands[$tool]} )); then
+            if eval "$cmd" > "$cdir/$out" 2>/dev/null && [[ -s $cdir/$out ]]; then
+                _ok "$tool → $out"
+            else
+                rm -f "$cdir/$out"
+                _warn "$tool — generation failed, skipped"
+            fi
+        fi
+    done
+
+    # Drop the compdump so the next shell rebuilds it with the new
+    # completions included.
+    rm -f "$CACHE"/zcompdump-*
+    _ok "Completion dump cleared — next shell will rebuild it."
+}
+
+# --------------------------------------------------
+# clean — clear caches
+# --------------------------------------------------
+_clean() {
+    _hdr "Clearing caches"
+    rm -rf "$CACHE"
+    _ok "Removed $CACHE"
+    rm -f "${XDG_CACHE_HOME:-$HOME/.cache}"/p10k-instant-prompt-*
+    _ok "Removed p10k instant prompt cache"
+    # Remove stale byte-compiled files from the repo and plugins.
+    find "$DOTFILES_DIR" -name '*.zwc' -delete 2>/dev/null
+    find "$HOME/.oh-my-zsh/custom" -name '*.zwc' -delete 2>/dev/null
+    _ok "Removed stale .zwc files"
+    print
+    print "  Next shell start will be slower while caches rebuild."
+}
+
+# --------------------------------------------------
+# check — health check
+# --------------------------------------------------
+_check() {
+    _hdr "Dotfiles"
+    if [[ -d $DOTFILES_DIR ]]; then
+        _ok "Repo at $DOTFILES_DIR"
+    else
+        _bad "Repo NOT found at $DOTFILES_DIR"
+        print "    Clone it, or set DOTFILES_DIR in ~/.zshrc.local"
+        return 1
+    fi
+
+    _hdr "Symlinks"
+    local f
+    for f in .zshrc .p10k.zsh .vimrc; do
+        if [[ -L "$HOME/$f" ]]; then
+            local target=$(readlink "$HOME/$f")
+            # Resolve both sides to real (symlink-free) paths before
+            # comparing — DOTFILES_DIR is already real, but readlink
+            # returns whatever was passed to `ln`, which may itself
+            # traverse a symlink (e.g. via ~/.dotfiles).
+            local target_real="${target:A}"
+            if [[ $target_real == $DOTFILES_DIR/* ]]; then
+                _ok "~/$f → $target"
+            else
+                _warn "~/$f → $target  (not from the dotfiles repo)"
+            fi
+        elif [[ -f "$HOME/$f" ]]; then
+            _bad "~/$f is a plain file, NOT linked to the repo"
+            print "    Edits to the repo will not take effect. Run: dotfiles-doctor link"
+        else
+            _warn "~/$f does not exist"
+        fi
+    done
+
+    _hdr "Config files"
+    for f in common/env.sh common/aliases.sh common/functions.sh \
+             common/lazy.sh common/ai.sh install.sh; do
+        if [[ -f "$DOTFILES_DIR/$f" ]]; then
+            if zsh -n "$DOTFILES_DIR/$f" 2>/dev/null; then
+                _ok "$f — syntax OK"
+            else
+                _bad "$f — SYNTAX ERROR"
+                zsh -n "$DOTFILES_DIR/$f"
+            fi
+        else
+            _warn "$f — missing"
+        fi
+    done
+
+    _hdr "Plugins"
+    local pd="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins"
+    for f in zsh-autosuggestions zsh-syntax-highlighting you-should-use; do
+        [[ -d "$pd/$f" ]] && _ok "$f" || _warn "$f — not installed"
+    done
+    [[ -d "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k" ]] \
+        && _ok "powerlevel10k" || _warn "powerlevel10k — not installed"
+
+    _hdr "Core tools"
+    local t
+    for t in git fzf rg fd bat eza zoxide jq delta gh docker aws op uv; do
+        (( ${+commands[$t]} )) && _ok "$t" || _warn "$t — not installed"
+    done
+
+    _hdr "Lazy loading"
+    # This script never sources common/lazy.sh itself (it is a
+    # standalone utility, not part of the interactive shell), so
+    # checking ${+functions[...]} in its own process always fails.
+    # Source env.sh + lazy.sh into a throwaway subshell instead —
+    # that's the only way to test the stubs for real rather than
+    # guessing from which directories exist on disk.
+    (
+        source "$DOTFILES_DIR/common/env.sh" 2>/dev/null
+        source "$DOTFILES_DIR/common/lazy.sh" 2>/dev/null
+        for t in nvm pyenv ca-token fuck; do
+            if (( ${+functions[$t]} )); then
+                print "OK $t"
+            else
+                print "SKIP $t"
+            fi
+        done
+    ) | while read -r _res t; do
+        if [[ $_res == OK ]]; then
+            _ok "$t — lazy stub active"
+        else
+            _warn "$t — no stub (tool not installed)"
+        fi
+    done
+
+    _hdr "Startup cost"
+    zmodload zsh/datetime
+    local s=$EPOCHREALTIME
+    zsh -i -c exit &>/dev/null
+    local ms=$(( (EPOCHREALTIME - s) * 1000 ))
+    printf '  %.0f ms  ' $ms
+    if   (( ms < 150 )); then print -P "%F{green}excellent%f"
+    elif (( ms < 300 )); then print -P "%F{green}good%f"
+    elif (( ms < 600 )); then print -P "%F{yellow}sluggish%f"
+    else                      print -P "%F{red}slow — run: dotfiles-doctor profile%f"
+    fi
+}
+
+# --------------------------------------------------
+# link — (re)link dotfiles into $HOME
+# --------------------------------------------------
+_link() {
+    _hdr "Linking dotfiles into \$HOME"
+    local f stamp=$(date +%Y%m%d-%H%M%S)
+    for f in .zshrc .p10k.zsh .vimrc .bashrc; do
+        [[ -f "$DOTFILES_DIR/$f" ]] || continue
+        if [[ -e "$HOME/$f" && ! -L "$HOME/$f" ]]; then
+            mv "$HOME/$f" "$HOME/$f.pre-dotfiles.$stamp"
+            _warn "backed up existing ~/$f → ~/$f.pre-dotfiles.$stamp"
+        fi
+        ln -sfn "$DOTFILES_DIR/$f" "$HOME/$f"
+        _ok "~/$f → $DOTFILES_DIR/$f"
+    done
+
+    # ~/.dotfiles is the path every config file refers to. Point it
+    # at the real checkout so the repo can live anywhere.
+    #
+    # Guard against linking it to itself: DOTFILES_DIR is normally
+    # the real repo path (resolved from this script's own location),
+    # but if it were ever left as the literal string "$HOME/.dotfiles"
+    # this would create a symlink pointing at itself.
+    if [[ "$DOTFILES_DIR" == "$HOME/.dotfiles" ]]; then
+        _bad "DOTFILES_DIR resolved to ~/.dotfiles itself — refusing to self-link."
+        _bad "Run this script from inside the real repo checkout."
+    elif [[ ! -e "$HOME/.dotfiles" ]] || [[ -L "$HOME/.dotfiles" ]]; then
+        ln -sfn "$DOTFILES_DIR" "$HOME/.dotfiles"
+        _ok "~/.dotfiles → $DOTFILES_DIR"
+    fi
+
+    # Claude Code skills — linked into ~/.claude/skills so they
+    # apply in every repo, not just this one.
+    if [[ -d "$DOTFILES_DIR/claude/skills" ]]; then
+        command mkdir -p "$HOME/.claude/skills"
+        local s
+        for s in "$DOTFILES_DIR"/claude/skills/*(N/); do
+            ln -sfn "$s" "$HOME/.claude/skills/${s:t}"
+            _ok "~/.claude/skills/${s:t} → ${s}"
+        done
+    fi
+
+    print
+    print "  Run 'exec zsh' to load the new configuration."
+}
+
+# --------------------------------------------------
+case "${1:-check}" in
+    bench|benchmark) _bench "${2:-10}" ;;
+    profile|prof)    _profile ;;
+    trace)           _trace ;;
+    completions|comp) _completions ;;
+    clean)           _clean ;;
+    check|doctor)    _check ;;
+    link)            _link ;;
+    *)
+        print "dotfiles-doctor — benchmark, profile and repair your shell"
+        print
+        print "  bench [runs]   Time shell startup (default 10 runs)"
+        print "  profile        Show the slowest functions (zprof)"
+        print "  trace          Line-by-line startup timing"
+        print "  completions    Rebuild the tool completion cache"
+        print "  clean          Clear all caches"
+        print "  check          Health check (default)"
+        print "  link           (Re)link dotfiles into \$HOME"
+        ;;
+esac

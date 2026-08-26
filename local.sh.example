@@ -1,0 +1,50 @@
+#!/bin/sh
+# ============================================
+# local.sh.example — copy to local.sh and fill in
+# ============================================
+#   cp local.sh.example local.sh
+#
+# local.sh is gitignored. Everything org-specific, machine-specific
+# or secret belongs there, never in a tracked file — this repo is
+# public. It is sourced LAST by install.sh, so anything set here
+# overrides the generic defaults in common/.
+# ============================================
+
+# ============================================
+# AWS CodeArtifact (private Python package index)
+# ============================================
+# Powers the lazy `ca-token` helper and the pip/uv/poetry/twine
+# wrappers in common/lazy.sh. Leave these unset if you don't use a
+# private index — the wrappers then pass straight through to the
+# real tool and never touch the network.
+# export CODEARTIFACT_PROFILE='your-aws-profile'
+# export CODEARTIFACT_DOMAIN='your-domain'
+# export CODEARTIFACT_OWNER='your-aws-account-id'
+
+# ============================================
+# Jira
+# ============================================
+# Powers the `jira` and `gswhv` helpers in common/functions.sh.
+# export JIRA_URL='https://yourcompany.atlassian.net/'
+# export JIRA_NAME='you@yourcompany.com'
+# export JIRA_PREFIX='PROJ'
+
+# ============================================
+# 1Password secret references
+# ============================================
+# Used by `aikeys` to load API keys into the current shell on
+# demand, so they never sit in plaintext on disk.
+# export OP_ANTHROPIC_REF="op://Private/Anthropic API/credential"
+# export OP_OPENAI_REF="op://Private/OpenAI API/credential"
+
+# ============================================
+# Behaviour toggles
+# ============================================
+# export DOTFILES_PYENV_SHIMS=1   # make pyenv authoritative for python3
+# export DOTFILES_VI_MODE=1       # vi key bindings instead of emacs
+
+# ============================================
+# Anything else machine-specific
+# ============================================
+# export PROJECTS_DIR="$HOME/Developer"
+# _path_prepend "$HOME/some/machine/specific/bin"; export PATH

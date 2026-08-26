@@ -16,7 +16,7 @@
 # ============================================
 # Shell Config Shortcuts
 # ============================================
-alias rl='source ~/.zshrc'
+alias rl='exec zsh'   # full restart; re-sourcing can double-apply state
 alias shrc='${EDITOR:-vim} ~/.zshrc'
 alias vimrc='${EDITOR:-vim} ~/.vimrc'
 
@@ -72,6 +72,7 @@ fi
 # Windows Executable Helpers
 # ============================================
 # "open" — macOS-like command to open files/URLs
+_dot_undef open towinpath tounixpath
 open() {
     if [[ -z "$1" ]]; then
         explorer.exe .
@@ -126,65 +127,29 @@ tounixpath() {
 (( ${+commands[delta]} )) && export GIT_PAGER='delta'
 
 # ============================================
-# Helper: cached eval — run "tool <args>" once,
-# cache the output, re-source from cache on startup.
-# Cache is invalidated when the binary is newer than
-# the cache file (i.e., after a tool upgrade).
+# Tool initialisation — cached, no forks
 # ============================================
-_dotfiles_cached_eval() {
-    local name="$1"; shift
-    local cmd="$1"; shift
-    local cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles"
-    local cache_file="$cache_dir/$name.zsh"
-    local bin_path="${commands[$cmd]}"
+# This file used to define its own _dotfiles_cached_eval and its
+# own lazy-nvm stubs. Both now live in shared code, so every
+# platform behaves identically:
+#
+#   _dot_cache_eval  → common/env.sh
+#   nvm / pyenv lazy → common/lazy.sh
+#
+# common/lazy.sh is sourced AFTER this file so its PATH entries win
+# over the system package manager's.
 
-    # Tool not installed — skip silently
-    [[ -z "$bin_path" ]] && return 0
-
-    if [[ ! -f "$cache_file" || "$bin_path" -nt "$cache_file" ]]; then
-        mkdir -p "$cache_dir"
-        "$cmd" "$@" > "$cache_file" 2>/dev/null
-    fi
-    source "$cache_file"
-}
-
-# ============================================
-# Tool Initializations (cached or lazy-loaded)
-# ============================================
-
-# zoxide — cached init (also handled by .zshrc fast-path,
-# but this covers the case where msys2.sh is sourced via
-# install.sh after the fast-path already returned)
-_dotfiles_cached_eval "zoxide" zoxide init zsh
+# zoxide — cached init
+(( ${+commands[zoxide]} )) && _dot_cache_eval zoxide zoxide init zsh
 
 # uv — cached shell completions
-_dotfiles_cached_eval "uv-completion" uv generate-shell-completion zsh
+(( ${+commands[uv]} )) && _dot_cache_eval uv uv generate-shell-completion zsh
 
-# pyenv — cached init
-if (( ${+commands[pyenv]} )); then
-    export PYENV_ROOT="$HOME/.pyenv"
-    export PATH="$PYENV_ROOT/bin:$PATH"
-    _dotfiles_cached_eval "pyenv" pyenv init -
-fi
-
-# ============================================
-# nvm — LAZY-LOADED (saves 1-2s on startup)
-# nvm.sh is only sourced the first time you run
-# nvm, node, npm, or npx.
-# ============================================
-export NVM_DIR="$HOME/.nvm"
-if [[ -s "$NVM_DIR/nvm.sh" ]]; then
-    # Placeholder functions that lazy-load on first call
-    _dotfiles_lazy_nvm() {
-        unfunction nvm node npm npx 2>/dev/null
-        source "$NVM_DIR/nvm.sh"
-        [[ -s "$NVM_DIR/bash_completion" ]] && source "$NVM_DIR/bash_completion"
-    }
-    nvm()  { _dotfiles_lazy_nvm; nvm "$@"; }
-    node() { _dotfiles_lazy_nvm; node "$@"; }
-    npm()  { _dotfiles_lazy_nvm; npm "$@"; }
-    npx()  { _dotfiles_lazy_nvm; npx "$@"; }
-fi
+# NOTE: nvm and pyenv are handled by common/lazy.sh.
+# The old lazy stubs here also shadowed node/npm/npx, which meant
+# the FIRST node call in every shell paid the full ~700ms nvm load.
+# lazy.sh instead puts the default Node version's bin directly on
+# PATH, so node/npm/npx are instant and only `nvm` itself is lazy.
 
 # ============================================
 # PATH additions

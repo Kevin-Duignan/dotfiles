@@ -46,6 +46,7 @@ alias pbpaste='powershell.exe -NoProfile -Command "Get-Clipboard"'
 # ============================================
 # open (macOS-like)
 # ============================================
+_dot_undef open
 open() { explorer.exe "${1:-.}"; }
 
 # ============================================

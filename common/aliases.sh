@@ -86,11 +86,14 @@ _has_cmd procs && alias pss='procs'
 # ============================================
 # ls — eza (drop-in compatible, safe to shadow)
 # ============================================
-if [ "$_dotfiles_is_msys" = 1 ]; then
-    # MSYS profile pre-sets `alias ls='ls --show-control-chars'`,
-    # which eza rejects. Clear it before defining ours.
-    unalias ls ll la lt 2>/dev/null
-fi
+# Cleared unconditionally, for two separate reasons:
+#   * The MSYS profile pre-sets `alias ls='ls --show-control-chars'`,
+#     which eza rejects.
+#   * The block below defines ls/ll/la/lt as FUNCTIONS on one
+#     branch. zsh parses the whole if/else before running it, so a
+#     pre-existing `ls` alias makes that a parse error even on the
+#     branch that never executes. See _dot_undef in common/env.sh.
+_dot_undef ls ll la lt
 
 if _has_cmd eza; then
     if [ "$_dotfiles_is_msys" = 1 ] && _has_cmd cygpath; then
@@ -142,6 +145,7 @@ fi
 # ============================================
 # -pp = --plain --plain: no line numbers, no grid, no paging.
 # Output is byte-identical to cat for piping purposes.
+_dot_undef cat        # defined as a function on the MSYS branch below
 if _has_cmd bat; then
     if [ "$_dotfiles_is_msys" = 1 ] && _has_cmd cygpath; then
         cat() { _win_wrap bat -pp "$@"; }
