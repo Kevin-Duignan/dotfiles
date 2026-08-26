@@ -12,10 +12,10 @@
 # Shell Config Shortcuts
 # ============================================
 if [ -n "$ZSH_VERSION" ]; then
-    alias rl='source ~/.zshrc'
+    alias rl='exec zsh'   # full restart; re-sourcing can double-apply state
     alias shrc='${EDITOR:-vim} ~/.zshrc'
 else
-    alias rl='source ~/.bashrc'
+    alias rl='exec bash'  # full restart; re-sourcing can double-apply state
     alias shrc='${EDITOR:-vim} ~/.bashrc'
 fi
 alias vimrc='${EDITOR:-vim} ~/.vimrc'
@@ -94,6 +94,7 @@ umask 022
 # ============================================
 
 # Open current directory in Windows Explorer
+_dot_undef wopen wpath
 wopen() {
     local target="${1:-.}"
     if [ -d "$target" ] || [ -f "$target" ]; then
@@ -146,44 +147,39 @@ if command -v fzf >/dev/null 2>&1; then
     fi
 fi
 
+# ============================================
+# Tool initialisation — cached, no forks
+# ============================================
+# Every `eval "$(tool init)"` below used to fork a subprocess on
+# each shell start. _dot_cache_eval (common/env.sh) runs each one
+# once, caches the output, and sources the cache thereafter.
+_dot_shell="bash"
+[ -n "$ZSH_VERSION" ] && _dot_shell="zsh"
+
 # zoxide (smart cd)
-if command -v zoxide >/dev/null 2>&1; then
-    if [ -n "$ZSH_VERSION" ]; then
-        eval "$(zoxide init zsh)"
-    elif [ -n "$BASH_VERSION" ]; then
-        eval "$(zoxide init bash)"
-    fi
-fi
+_has_cmd zoxide && _dot_cache_eval zoxide zoxide init "$_dot_shell"
+
+# direnv (per-directory environments)
+_has_cmd direnv && _dot_cache_eval direnv direnv hook "$_dot_shell"
+
+# uv completions
+_has_cmd uv && _dot_cache_eval uv uv generate-shell-completion "$_dot_shell"
+
+unset _dot_shell
 
 # delta (beautiful git diffs) — configure as git pager
-if command -v delta >/dev/null 2>&1; then
-    export GIT_PAGER='delta'
-fi
+_has_cmd delta && export GIT_PAGER='delta'
 
-# nvm
-export NVM_DIR="$HOME/.nvm"
-if [ -s "$NVM_DIR/nvm.sh" ]; then
-    source "$NVM_DIR/nvm.sh"
-fi
-if [ -s "$NVM_DIR/bash_completion" ]; then
-    source "$NVM_DIR/bash_completion"
-fi
-
-# uv (fast Python package manager)
-if command -v uv >/dev/null 2>&1; then
-    if [ -n "$ZSH_VERSION" ]; then
-        eval "$(uv generate-shell-completion zsh)"
-    elif [ -n "$BASH_VERSION" ]; then
-        eval "$(uv generate-shell-completion bash)"
-    fi
-fi
-
-# pyenv
-if command -v pyenv >/dev/null 2>&1; then
-    export PYENV_ROOT="$HOME/.pyenv"
-    export PATH="$PYENV_ROOT/bin:$PATH"
-    eval "$(pyenv init -)"
-fi
+# NOTE: nvm and pyenv are NOT initialised here any more.
+# common/lazy.sh handles both, lazily:
+#   * nvm  — the default Node version's bin goes straight on PATH,
+#            so node/npm/npx are instant; the `nvm` command itself
+#            loads nvm.sh on first use (saves ~700ms per shell).
+#   * pyenv — the `pyenv` command lazy-loads. Shims stay off PATH
+#            unless you set DOTFILES_PYENV_SHIMS=1, so pyenv does
+#            not silently change which python3 you get.
+# common/lazy.sh is sourced AFTER this file precisely so its PATH
+# entries take precedence over the system package manager's.
 
 # ============================================
 # WSL Display / GUI Support (WSLg or X11)

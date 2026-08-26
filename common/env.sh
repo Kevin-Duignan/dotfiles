@@ -21,6 +21,27 @@ else
 fi
 
 # ============================================
+# _dot_undef — make a function definition re-source safe
+# ============================================
+# zsh parses an ENTIRE compound command (an if/else block, a
+# function body) before it executes any of it. If a name is
+# currently an alias, parsing `name() { ... }` is a hard error:
+#
+#   defining function based on alias `ls'
+#   parse error near `()'
+#
+# and it fails even when the branch containing the definition would
+# never run. A first, clean shell is fine because nothing is
+# aliased yet — the error only appears when a config is sourced a
+# SECOND time into a shell that already has those aliases, or when
+# a pre-existing plugin aliased the name.
+#
+# Calling this before a block that defines such a function fixes
+# it. It must be its own statement, so that it has already run by
+# the time the following block is parsed.
+_dot_undef() { unalias "$@" >/dev/null 2>&1; return 0; }
+
+# ============================================
 # Cached tool initialisation — used by every platform
 # ============================================
 # Tools like zoxide, direnv and pyenv generate their shell
@@ -206,8 +227,14 @@ if _has_cmd bat; then
 fi
 
 # ============================================
-# Jira (used by the jira helper functions)
+# Jira (used by the `jira` and `gswhv` helpers)
 # ============================================
-export JIRA_URL='https://yourcompany.atlassian.net/'
-export JIRA_NAME='you@yourcompany.com'
-export JIRA_PREFIX='HVSD'
+# Deliberately empty here — this repo is public. Set the real
+# values in local.sh, which is gitignored and sourced last:
+#
+#   export JIRA_URL='https://yourcompany.atlassian.net/'
+#   export JIRA_NAME='you@yourcompany.com'
+#   export JIRA_PREFIX='PROJ'
+export JIRA_URL="${JIRA_URL:-}"
+export JIRA_NAME="${JIRA_NAME:-}"
+export JIRA_PREFIX="${JIRA_PREFIX:-}"

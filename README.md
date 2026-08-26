@@ -6,21 +6,69 @@ A modular, multi-environment dotfiles repository that keeps macOS, Windows WSL, 
 ~/.dotfiles/
 ├── .bashrc                 # Bash shell config (Git Bash / WSL fallback)
 ├── .zshrc                  # Zsh shell config  (macOS / WSL / MSYS2)
-│                           #   MSYS2: lightweight fast-path (no OMZ)
-│                           #   Others: full Oh My Zsh
+│                           #   Oh My Zsh's core is NOT loaded — plugins are
+│                           #   sourced directly for speed. See "Performance".
 ├── .p10k.zsh               # Powerlevel10k prompt config (all Zsh envs)
 ├── .vimrc                  # Vim editor config (all environments)
 ├── install.sh              # Entry point — detects OS, sources everything
+│                           #   in a deliberate order (see comments in the file)
 ├── common/
+│   ├── env.sh              # PATH helpers, locale, XDG dirs, fzf config,
+│   │                       #   the shared _dot_cache_eval helper
 │   ├── aliases.sh          # Cross-platform aliases (ls, git, docker, uv…)
 │   ├── functions.sh        # Cross-platform functions (extract, mkcd, yazi…)
+│   ├── lazy.sh             # Lazy loaders: AWS CodeArtifact, nvm, pyenv,
+│   │                       #   thefuck, conda — nothing here forks at startup
+│   ├── ai.sh                # Claude Code helpers, `devinfo`, 1Password-backed
+│   │                       #   key loading, agent-safe execution helpers
 │   └── commitwell.sh       # Interactive git commit wizard (standalone script)
 ├── os/
-│   ├── macos.sh            # Homebrew, pbcopy, MacVim, macOS utilities
+│   ├── macos.sh            # Homebrew (no fork), completion cache, macOS utils
 │   ├── wsl.sh              # Windows interop, clip.exe, wslpath helpers
 │   ├── gitbash.sh          # Minimal / fast-start config for Git Bash
 │   └── msys2.sh            # pacman, cygpath, cached tool inits, lazy nvm
+├── tools/
+│   └── dotfiles-doctor     # bench / profile / trace / check / link / clean
+├── claude/
+│   └── skills/
+│       └── kevin-shell-environment/   # Claude Code skill: teaches agents
+│                           #   which tools you prefer and where the sharp
+│                           #   edges are. Linked into ~/.claude/skills/.
 └── local.sh                # (create manually) Machine-specific overrides — git-ignored
+```
+
+---
+
+## Performance
+
+Interactive shell startup went from **~2.6 seconds to ~110-170ms** — a 15-20x
+speedup — without dropping any tool, alias or function. The three rules that
+keep it that way:
+
+1. **Never fork a subprocess at startup.** Anything that used to run
+   `eval "$(tool init)"` on every shell now runs once, caches the output to
+   `~/.cache/zsh/`, and sources the cache. See `_dot_cache_eval` in
+   `common/env.sh`.
+2. **Never eagerly source a tool's init script if a lazy stub will do.**
+   `common/lazy.sh` covers the worst offenders: the AWS CodeArtifact token
+   fetch (was 1.2s of *network I/O* on every shell — now fetched on demand
+   and cached for 11 hours), nvm (~0.7s), pyenv and thefuck.
+3. **Aliases and functions are free.** Defining one costs microseconds, not
+   milliseconds — it's the subprocess forks and eagerly-sourced init scripts
+   that cost time. `common/aliases.sh` inlines every alias a heavy Oh My Zsh
+   plugin used to provide, without loading the plugin.
+
+AI coding agents (Claude Code, etc.) are detected via `$CLAUDECODE` and
+similar env vars and take an even faster path — no prompt, no syntax
+highlighting, no completions, since none of that is agent-visible. Aliases,
+functions and `$PATH` are identical either way.
+
+Check and benchmark your own setup any time:
+
+```bash
+dotfiles-doctor check     # symlinks, syntax, tools, startup cost
+dotfiles-doctor bench     # 10-run startup benchmark
+dotfiles-doctor profile   # find what got slow (zprof)
 ```
 
 ---
@@ -340,28 +388,35 @@ vim +PlugInstall +qall
 
 ---
 
-### 3 · Windows Git Bash (Bash — Portable / Zero Admin)
+### 3 · Windows Git Bash (Bash — Minimal, Fast-Start)
 
-> Git Bash is the **fast-start, zero-install** environment designed for locked-down machines. Everything runs from a portable folder — **no admin rights, no installers, no package managers required**. Use WSL or MSYS2 when you need a full-featured setup.
+Git Bash is the **quickest, simplest way** to get a Unix-like shell on Windows. It is ideal for locked-down machines or when you want a portable, zero-admin setup. No extra plugins, no fancy tools—just Bash, Git, and your shared dotfiles.
 
-#### 3a. Download Git for Windows Portable
+#### 3a. Install Git Bash (choose one method)
+
+**Option 1: Standard Installer**
 
 1. Go to [git-scm.com/download/win](https://git-scm.com/download/win).
-2. Under **Other Git for Windows downloads**, click **Portable ("thumbdrive edition")** → **64-bit Git for Windows Portable**.
-3. Run the downloaded `.exe` — it's a self-extracting archive, **not** an installer. Extract it to a folder you control, e.g.:
+2. Download the regular **Git for Windows** installer and run it. This will install Git Bash to your system.
+3. Launch Git Bash from the Start menu.
+
+**Option 2: Portable (Thumbdrive Edition)**
+
+1. On the same [download page](https://git-scm.com/download/win), under **Other Git for Windows downloads**, click **Portable ("thumbdrive edition")** → **64-bit Git for Windows Portable**.
+2. Run the downloaded `.exe` (self-extracting archive, **not** an installer). Extract it to a folder you control, e.g.:
    ```
    C:\Users\<you>\tools\PortableGit
    ```
-4. Launch Git Bash via:
+3. Launch Git Bash via:
    ```
    C:\Users\<you>\tools\PortableGit\git-bash.exe
    ```
 
 > **Tip:** Pin `git-bash.exe` to your taskbar or create a shortcut. You can also add the `bin/` folder to your Windows PATH via User Environment Variables (no admin) to get `git`, `bash`, `curl`, `vim`, etc. available in PowerShell and `cmd`.
 
-#### 3b. Install uv (no admin)
+#### 3b. (Optional) Install uv (Python package manager)
 
-From inside Git Bash:
+If you want the `uv` Python package manager:
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -369,21 +424,27 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 This installs to `~/.local/bin/` which is already on PATH via `os/gitbash.sh`.
 
-#### 3c. (Optional) Portable tools
+#### 3c. (Optional) Install zoxide (smarter `cd`)
 
-If you want `fzf` or `zoxide` on Git Bash, download their standalone binaries — no installer needed:
+Git Bash has no built-in package manager, so pick whichever fits your machine:
 
-| Tool | Download | Where to put it |
-|------|----------|-----------------|
-| **fzf** | [github.com/junegunn/fzf/releases](https://github.com/junegunn/fzf/releases) → `fzf-*-windows_amd64.zip` | Extract `fzf.exe` into `~/bin/` or your PortableGit `usr/bin/` |
-| **zoxide** | [github.com/ajeetdsouza/zoxide/releases](https://github.com/ajeetdsouza/zoxide/releases) → `zoxide-*-x86_64-pc-windows-msvc.zip` | Extract `zoxide.exe` into `~/bin/` |
-
-Create `~/bin/` if it doesn't exist — it's already on `$PATH` via `os/gitbash.sh`:
+**Method 1 — winget (if available on your system):**
 
 ```bash
-mkdir -p ~/bin
-# Then drop fzf.exe and/or zoxide.exe into ~/bin/
+winget install ajeetdsouza.zoxide
 ```
+
+**Method 2 — manual binary (portable Git Bash / no winget / locked-down machine):**
+
+```bash
+mkdir -p ~/.local/bin
+curl -Lo /tmp/zoxide.zip "$(curl -s https://api.github.com/repos/ajeetdsouza/zoxide/releases/latest \
+  | grep -o 'https://[^"]*x86_64-pc-windows-msvc\.zip')"
+unzip -o /tmp/zoxide.zip -d ~/.local/bin
+rm /tmp/zoxide.zip
+```
+
+`~/.local/bin` is already on `PATH` via `os/gitbash.sh`.
 
 #### 3d. Clone the repo
 
@@ -391,11 +452,24 @@ mkdir -p ~/bin
 git clone https://github.com/Kevin-Duignan/dotfiles.git ~/.dotfiles
 ```
 
-#### 3e. Install vim-plug
+#### 3e. (Optional) Install vim-plug (Vim plugin manager)
+
+If you want to use Vim plugins, install vim-plug (optional):
+
+**Method 1 — curl:**
 
 ```bash
 curl -fLo ~/.vim/autoload/plug.vim --create-dirs \
   https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+```
+
+**Method 2 — git clone (if curl is blocked by a corporate proxy):**
+
+```bash
+git clone --depth 1 https://github.com/junegunn/vim-plug.git /tmp/vim-plug
+mkdir -p ~/.vim/autoload
+cp /tmp/vim-plug/plug.vim ~/.vim/autoload/plug.vim
+rm -rf /tmp/vim-plug
 ```
 
 #### 3f. Create Vim directories
@@ -418,7 +492,9 @@ cp ~/.dotfiles/.vimrc  ~/.vimrc
 > alias dfsync='cp ~/.dotfiles/.bashrc ~/.bashrc && cp ~/.dotfiles/.vimrc ~/.vimrc && source ~/.bashrc'
 > ```
 
-#### 3h. Install Vim plugins
+#### 3h. (Optional) Install Vim plugins
+
+If you installed vim-plug and want plugins:
 
 ```bash
 vim +PlugInstall +qall
@@ -602,26 +678,22 @@ p10k configure
 
 #### Profiling startup time
 
-To measure where time is spent during MSYS2 shell startup:
+Use `dotfiles-doctor` (works on every platform, not just MSYS2):
 
 ```bash
-# Quick overall timing
-time zsh -i -c exit
-
-# Detailed function-level profiling — add to FIRST line of ~/.zshrc:
-#   zmodload zsh/zprof
-# Then add to LAST line:
-#   zprof
-# Restart shell to see the report. Remove both lines when done.
+dotfiles-doctor bench      # 10-run timing, interactive and non-interactive
+dotfiles-doctor profile    # function-level breakdown (zprof), top 25 by self time
+dotfiles-doctor trace      # line-by-line timing of the slowest 30 lines
 ```
 
 #### Clearing caches
 
-If a tool was upgraded or something seems stale, clear the caches:
+If a tool was upgraded or something seems stale:
 
 ```bash
-rm -rf ~/.cache/dotfiles ~/.cache/fzf-init.zsh ~/.zcompdump
-source ~/.zshrc
+dotfiles-doctor clean      # clears ~/.cache/zsh, p10k instant-prompt cache,
+                            # and stale .zwc byte-compiled files
+exec zsh
 ```
 
 ---
@@ -845,20 +917,40 @@ uv --version         # uv should be found
 
 ## Machine-Specific Overrides
 
-Create `~/.dotfiles/local.sh` for anything that should **not** be committed — API tokens, work-specific PATHs, proxy settings, etc:
+**This repo is public.** Nothing org-specific, machine-specific or secret is
+committed — no employer names, account IDs, internal URLs or email addresses.
+All of it lives in `local.sh`, which is gitignored and sourced **last**, so
+anything set there overrides the generic defaults in `common/`.
 
 ```bash
-touch ~/.dotfiles/local.sh
+cp ~/.dotfiles/local.sh.example ~/.dotfiles/local.sh
+$EDITOR ~/.dotfiles/local.sh
 ```
+
+The config degrades gracefully when it's absent — a fresh clone works
+immediately, it just won't have your Jira or private package index wired up:
+
+| Unset value | Effect |
+|---|---|
+| `CODEARTIFACT_DOMAIN` / `_OWNER` / `_PROFILE` | `pip`/`uv`/`poetry`/`twine` pass straight through to the real tool; no token fetch, no network call |
+| `JIRA_URL` / `JIRA_PREFIX` | `jira` and `gswhv` print how to configure themselves instead of failing |
+| `OP_ANTHROPIC_REF` / `OP_OPENAI_REF` | `aikeys` explains what to set |
 
 ```bash
 # Example local.sh contents
-export GITHUB_TOKEN="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-export HTTP_PROXY="http://proxy.corp.example.com:8080"
-export PATH="$HOME/work-tools/bin:$PATH"
+export CODEARTIFACT_PROFILE='your-aws-profile'
+export CODEARTIFACT_DOMAIN='your-domain'
+export CODEARTIFACT_OWNER='your-aws-account-id'
+
+export JIRA_URL='https://yourcompany.atlassian.net/'
+export JIRA_PREFIX='PROJ'
+
+export DOTFILES_PYENV_SHIMS=1   # make pyenv authoritative for python3
+export DOTFILES_VI_MODE=1       # vi key bindings instead of emacs
 ```
 
-This file is sourced last (after OS-specific config) and should be added to `.gitignore`.
+> **Secrets:** prefer `aikeys` / `opkey` (1Password-backed, loaded on demand)
+> over exporting API keys here in plaintext. See `common/ai.sh`.
 
 ---
 
@@ -916,6 +1008,8 @@ This file is sourced last (after OS-specific config) and should be added to `.gi
 | `cdwin` / `cddl` | Navigate to `C:\Users\Kevin-Duignan` paths |
 | `clip` / `paste` | `clip.exe` / `powershell Get-Clipboard` |
 | `open [path]` | Open in Explorer |
+
+> **`cd` / `z` (zoxide):** not bundled with Git Bash — no package manager ships it automatically. Install it manually (see [step 3c](#3-windows-git-bash-bash--minimal-fast-start)) to get smart `cd` support.
 
 ### MSYS2 Only
 

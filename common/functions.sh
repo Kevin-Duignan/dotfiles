@@ -81,16 +81,22 @@ if [ -f "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/.gitmoji-list.txt" ]; then
     alias gmoji='cat "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/.gitmoji-list.txt"'
 fi
 
-# gswhv <ticket> — create/switch to an HVSD-prefixed branch.
+# gswhv <ticket> — create/switch to a ticket-prefixed branch.
+# The prefix comes from $JIRA_PREFIX, set in local.sh (gitignored).
 gswhv() {
-    if [ -z "$1" ]; then
-        echo "Usage: gswhv <ticket-number>  →  HVSD-<ticket-number>"
+    if [ -z "$JIRA_PREFIX" ]; then
+        echo "gswhv: \$JIRA_PREFIX is not set. Add it to local.sh:" >&2
+        echo "         export JIRA_PREFIX='PROJ'" >&2
         return 1
     fi
-    # Accept "1234", "HVSD-1234" or "hvsd-1234" and normalise.
-    _hv=$(echo "$1" | sed 's/^[Hh][Vv][Ss][Dd]-//')
-    git switch -c "${JIRA_PREFIX:-HVSD}-$_hv" 2>/dev/null \
-        || git switch "${JIRA_PREFIX:-HVSD}-$_hv"
+    if [ -z "$1" ]; then
+        echo "Usage: gswhv <ticket-number>  →  ${JIRA_PREFIX}-<ticket-number>"
+        return 1
+    fi
+    # Accept "1234", "PROJ-1234" or "proj-1234" and normalise.
+    _hv=$(printf '%s' "$1" | sed "s/^[Pp][Rr][Oo][Jj]-//; s/^$JIRA_PREFIX-//I")
+    git switch -c "${JIRA_PREFIX}-$_hv" 2>/dev/null \
+        || git switch "${JIRA_PREFIX}-$_hv"
     unset _hv
 }
 
@@ -104,12 +110,19 @@ gbclean() {
 # Jira — inlined from the OMZ jira plugin
 # ============================================
 # jira            → open the Jira dashboard
-# jira 1234       → open HVSD-1234
-# jira HVSD-1234  → open HVSD-1234
+# jira 1234       → open <JIRA_PREFIX>-1234
+# jira PROJ-1234  → open PROJ-1234
 # jira .          → open the ticket named by the current branch
+#
+# $JIRA_URL and $JIRA_PREFIX come from local.sh (gitignored).
 jira() {
-    _jira_base="${JIRA_URL:-https://yourcompany.atlassian.net/}"
-    _jira_base="${_jira_base%/}"
+    if [ -z "$JIRA_URL" ]; then
+        echo "jira: \$JIRA_URL is not set. Add it to local.sh:" >&2
+        echo "        export JIRA_URL='https://yourcompany.atlassian.net/'" >&2
+        echo "        export JIRA_PREFIX='PROJ'" >&2
+        return 1
+    fi
+    _jira_base="${JIRA_URL%/}"
 
     if [ -z "$1" ]; then
         _jira_target="$_jira_base/jira/your-work"
@@ -126,7 +139,7 @@ jira() {
     else
         case "$1" in
             *-*) _jira_key="$1" ;;
-            *)   _jira_key="${JIRA_PREFIX:-HVSD}-$1" ;;
+            *)   _jira_key="${JIRA_PREFIX}-$1" ;;
         esac
         _jira_target="$_jira_base/browse/$(echo "$_jira_key" | tr '[:lower:]' '[:upper:]')"
     fi
