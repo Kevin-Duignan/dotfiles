@@ -7,6 +7,19 @@
 # subprocesses. They only run when called.
 # ============================================
 
+# Earlier versions of this repo shipped `dotsync`, `dotsync-cp` and friends
+# as aliases in common/aliases.sh. A live alias breaks the function
+# definitions below, because the shell expands the alias while parsing
+# `name() {` and reports "syntax error near unexpected token `('". That bites
+# when an existing session re-sources this file after a pull, so drop any
+# colliding alias before defining anything.
+for _fn_stale in dotsync dotsync-cp dotsync_cp ports-kill ports_kill \
+    dotfiles gbclean gswhv jira extract ua mkcd take serve backup up proj \
+    vimi openi wfzf ffzf frg fbr fco fkill fzfdlog y batdiff; do
+    unalias "$_fn_stale" 2>/dev/null
+done
+unset _fn_stale
+
 if ! command -v _has_cmd >/dev/null 2>&1; then
     if [ -n "$ZSH_VERSION" ]; then
         _has_cmd() { (( ${+commands[$1]} )); }
