@@ -946,7 +946,7 @@ export JIRA_URL='https://yourcompany.atlassian.net/'
 export JIRA_PREFIX='PROJ'
 
 export DOTFILES_PYENV_SHIMS=1   # make pyenv authoritative for python3
-export DOTFILES_VI_MODE=1       # vi key bindings instead of emacs
+export DOTFILES_VI_MODE=0       # emacs key bindings (default is vi)
 ```
 
 > **Secrets:** prefer `aikeys` / `opkey` (1Password-backed, loaded on demand)
