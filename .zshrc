@@ -356,7 +356,7 @@ fi
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 
 # ============================================
-# 13. Syntax highlighting — MUST BE LAST
+# 13. Syntax highlighting — MUST BE LAST of the plugins
 # ============================================
 # This plugin wraps every ZLE widget that exists at the moment it
 # loads. Anything defining widgets after it will not be highlighted.
@@ -368,3 +368,32 @@ if (( ! DOTFILES_IS_AGENT )); then
 fi
 
 unset _dot_plugdir
+
+# ============================================
+# 14. Warp — subshell integration ("Warpify")
+# ============================================
+# MUST BE THE VERY LAST THING IN THIS FILE.
+#
+# Warp gets its block UI, its own input editor and its vi mode from
+# a shell-integration handshake. For the shell Warp starts itself
+# that handshake is automatic, but any shell Warp did NOT launch —
+# one behind ssh, inside docker/tmux, a `zsh` you ran by hand, or a
+# subshell — has to announce itself. This DCS sequence is that
+# announcement; Warp calls it "Warpify subshell".
+#
+# Why it lives at the end: the hook tells Warp the rc file is
+# finished and the prompt is about to appear. Emitted earlier it
+# races the rest of this file, and p10k's instant prompt (section 2)
+# would swallow it outright.
+#
+# Guards:
+#   TERM_PROGRAM   — only Warp understands this sequence. Every
+#                    other terminal would print mojibake.
+#   DOTFILES_IS_AGENT — agents parse stdout; never inject escapes.
+#   [[ -o interactive ]] and [ -t 1 ] — a real tty only, so the
+#                    sequence can never land in a captured pipe.
+if [[ $TERM_PROGRAM == WarpTerminal ]] \
+   && (( ! DOTFILES_IS_AGENT )) \
+   && [[ -o interactive ]] && [ -t 1 ]; then
+    printf '\eP$f{"hook": "SourcedRcFileForWarp", "value": { "shell": "zsh" }}\x9c'
+fi
