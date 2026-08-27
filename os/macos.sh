@@ -140,6 +140,16 @@ fi
 if [ -n "$ZSH_VERSION" ] && command -v _dot_cache_eval >/dev/null 2>&1; then
 
     # zoxide — smart cd. Was 20ms as an eval, ~1ms cached.
+    #
+    # _ZO_DOCTOR=0 suppresses zoxide's "initialize me last" warning.
+    # That warning is a false positive here: zoxide is initialised
+    # from os/macos.sh (~/.zshrc section 9) and the line-editor
+    # plugins deliberately load after it in section 13, which is the
+    # order zsh-syntax-highlighting requires. Left enabled, zoxide
+    # writes four lines to stderr on EVERY shell startup, which is
+    # stray output that terminal shell-integration handshakes (Warp
+    # among them) can choke on.
+    export _ZO_DOCTOR=0
     _has_cmd zoxide && _dot_cache_eval zoxide zoxide init zsh
 
     # fzf — key bindings and completion. Was 80ms via the OMZ
@@ -182,12 +192,37 @@ alias paste='pbpaste'
 # ============================================
 # MacVim
 # ============================================
-# NOTE: `vim` is intentionally NOT aliased to `mvim`. Aliasing it
-# breaks $EDITOR workflows (git commit, fc, edit-command-line) that
-# need a blocking terminal editor. Use `gvim` when you want the GUI.
+# `vim` opens the MacVim GUI, reusing the existing window as a new
+# tab. This is the long-standing behaviour here and it is what the
+# muscle memory expects.
+#
+# Note that /opt/homebrew/bin/vim is ALSO MacVim — Homebrew's
+# macvim formula installs a terminal build of vim alongside the
+# .app. So without this alias `vim` still runs MacVim, just the
+# console version, which is why "vim stopped opening MacVim" looks
+# like the GUI vanished rather than the binary changing.
+#
+# $EDITOR is deliberately pinned to the terminal binary below.
+# Aliases are not consulted when git, fc or edit-command-line spawn
+# $EDITOR, but pinning the full path makes that explicit and
+# guarantees those callers get an editor that BLOCKS — which
+# -p --remote-silent does not.
 if _has_cmd mvim; then
-    alias gvim='mvim --remote-tab-silent'
+    mvim() {
+        command mvim --remote-silent-tab "$@"
+    }
+    alias vim='mvim'
+    alias gvim='mvim'
     alias gvimrc='mvim ~/.gvimrc'
+
+    # Blocking, in-terminal vim for anything that waits on $EDITOR.
+    alias vimt='command vim'
+    export EDITOR="${commands[vim]:-vim}"
+    export VISUAL="$EDITOR"
+    export GIT_EDITOR="$EDITOR"
+
+    # Custom tools use the GUI function to open files in tabs
+    export GUI_EDITOR="mvim"
 fi
 
 # ============================================

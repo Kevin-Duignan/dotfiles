@@ -197,16 +197,16 @@ fi
 # ============================================
 # Config file shortcuts
 # ============================================
-alias zshrc='${EDITOR:-vim} ~/.zshrc'
-alias zshloc='${EDITOR:-vim} ~/.zshrc.local'
-alias zshenv='${EDITOR:-vim} ${DOTFILES_DIR:-$HOME/.dotfiles}/common/env.sh'
-alias zshals='${EDITOR:-vim} ${DOTFILES_DIR:-$HOME/.dotfiles}/common/aliases.sh'
-alias zshfunc='${EDITOR:-vim} ${DOTFILES_DIR:-$HOME/.dotfiles}/common/functions.sh'
-alias zshlazy='${EDITOR:-vim} ${DOTFILES_DIR:-$HOME/.dotfiles}/common/lazy.sh'
-alias zshai='${EDITOR:-vim} ${DOTFILES_DIR:-$HOME/.dotfiles}/common/ai.sh'
-alias bashrc='${EDITOR:-vim} ~/.bashrc'
-alias vimrc='${EDITOR:-vim} ~/.vimrc'
-alias p10k-cfg='${EDITOR:-vim} ${DOTFILES_DIR:-$HOME/.dotfiles}/.p10k.zsh'
+alias zshrc='${GUI_EDITOR:-${EDITOR:-${commands[vim]:-vim}}} ~/.zshrc'
+alias zshloc='${GUI_EDITOR:-${EDITOR:-${commands[vim]:-vim}}} ~/.zshrc.local'
+alias zshenv='${GUI_EDITOR:-${EDITOR:-${commands[vim]:-vim}}} ${DOTFILES_DIR:-$HOME/.dotfiles}/common/env.sh'
+alias zshals='${GUI_EDITOR:-${EDITOR:-${commands[vim]:-vim}}} ${DOTFILES_DIR:-$HOME/.dotfiles}/common/aliases.sh'
+alias zshfunc='${GUI_EDITOR:-${EDITOR:-${commands[vim]:-vim}}} ${DOTFILES_DIR:-$HOME/.dotfiles}/common/functions.sh'
+alias zshlazy='${GUI_EDITOR:-${EDITOR:-${commands[vim]:-vim}}} ${DOTFILES_DIR:-$HOME/.dotfiles}/common/lazy.sh'
+alias zshai='${GUI_EDITOR:-${EDITOR:-${commands[vim]:-vim}}} ${DOTFILES_DIR:-$HOME/.dotfiles}/common/ai.sh'
+alias bashrc='${GUI_EDITOR:-${EDITOR:-${commands[vim]:-vim}}} ~/.bashrc'
+alias vimrc='${GUI_EDITOR:-${EDITOR:-${commands[vim]:-vim}}} ~/.vimrc'
+alias p10k-cfg='${GUI_EDITOR:-${EDITOR:-${commands[vim]:-vim}}} ${DOTFILES_DIR:-$HOME/.dotfiles}/.p10k.zsh'
 
 # ============================================
 # Dotfiles management

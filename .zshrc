@@ -44,13 +44,13 @@ esac
 # ============================================
 # 2. Powerlevel10k instant prompt
 # ============================================
-# Must stay near the top. Nothing above this may write to the
-# console or read input. This renders the prompt from cache before
-# the rest of the file runs, so the shell *feels* instant even
-# while the remaining work finishes.
-if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-    source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
-fi
+# Only run if NOT inside Warp, as it breaks Warpification hooks
+#if [[ -z "$WARP_TERMINAL_SHELL" ]]; then
+#    if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+#        source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+#    fi
+#fi
+
 
 # ============================================
 # 3. Cache helpers
@@ -187,15 +187,86 @@ zstyle ':completion:*:*:vim:*:*files' ignored-patterns '*.pyc|*.o|*.so'
 # ============================================
 # 8. Key bindings
 # ============================================
-# Emacs bindings by default — this matches the behaviour of the
-# previous config. For vi bindings, set DOTFILES_VI_MODE=1 in
-# ~/.zshrc.local (see section 12).
-if [[ ${DOTFILES_VI_MODE:-0} == 1 ]]; then
+# Vi bindings by default — this matches the behaviour of the
+# previous config, which ran `bindkey -v` plus the Oh My Zsh
+# vi-mode plugin. Set DOTFILES_VI_MODE=0 in ~/.zshrc.local (see
+# section 12) if you want emacs bindings instead.
+if [[ ${DOTFILES_VI_MODE:-1} == 1 ]]; then
     bindkey -v
+    # Time (in hundredths of a second) zsh waits for a multi-key
+    # sequence. The default 40 makes Escape feel sluggish because
+    # zsh is still waiting to see if an escape sequence follows.
     export KEYTIMEOUT=1
-    bindkey '^R' history-incremental-search-backward
-    bindkey -M viins '^A' beginning-of-line
-    bindkey -M viins '^E' end-of-line
+
+    # Keep the emacs-style movement keys that are muscle memory
+    # even for vi users, in BOTH keymaps.
+    for _dot_km in viins vicmd; do
+        bindkey -M $_dot_km '^A' beginning-of-line
+        bindkey -M $_dot_km '^E' end-of-line
+        bindkey -M $_dot_km '^K' kill-line
+        bindkey -M $_dot_km '^R' history-incremental-search-backward
+        bindkey -M $_dot_km '^S' history-incremental-search-forward
+        bindkey -M $_dot_km '^P' up-line-or-history
+        bindkey -M $_dot_km '^N' down-line-or-history
+    done
+    unset _dot_km
+
+    # `bindkey -v` drops these, and losing backspace-over-newline
+    # and word-erase in insert mode is the single most jarring
+    # thing about a bare vi keymap.
+    bindkey -M viins '^?' backward-delete-char
+    bindkey -M viins '^H' backward-delete-char
+    bindkey -M viins '^W' backward-kill-word
+    bindkey -M viins '^U' backward-kill-line
+
+    # Text objects and surround, as the OMZ plugin set up: lets you
+    # do ci", da(, cs'" and friends on the command line.
+    autoload -Uz select-bracketed select-quoted
+    zle -N select-bracketed
+    zle -N select-quoted
+    for _dot_km in viopp visual; do
+        bindkey -M $_dot_km -- '-' vi-up-line-or-history
+        for _dot_c in {a,i}${(s..)^:-\'\"\`\|,./:;=+@}; do
+            bindkey -M $_dot_km $_dot_c select-quoted
+        done
+        for _dot_c in {a,i}${(s..)^:-'()[]{}<>bB'}; do
+            bindkey -M $_dot_km $_dot_c select-bracketed
+        done
+    done
+    unset _dot_km _dot_c
+
+    autoload -Uz surround
+    zle -N delete-surround surround
+    zle -N add-surround surround
+    zle -N change-surround surround
+    bindkey -M vicmd 'cs' change-surround
+    bindkey -M vicmd 'ds' delete-surround
+    bindkey -M vicmd 'ys' add-surround
+    bindkey -M visual 'S'  add-surround
+
+    # Cursor shape follows the mode: block in command mode, beam in
+    # insert mode. Warp, iTerm2 and Terminal.app all honour this,
+    # and without it there is no way to tell which mode you are in.
+    _dot_vi_cursor() {
+        case ${KEYMAP:-viins} in
+            vicmd)         print -n '\e[2 q' ;;   # steady block
+            viins|main|*)  print -n '\e[6 q' ;;   # steady beam
+        esac
+    }
+    zle -N zle-keymap-select _dot_vi_cursor
+    # Also reset on every new prompt — otherwise the shape leaks in
+    # from whatever the last full-screen program left behind.
+    _dot_vi_cursor_init() { _dot_vi_cursor; }
+    autoload -Uz add-zsh-hook
+    add-zsh-hook precmd _dot_vi_cursor_init
+    # And back to a beam before running a command, so tools that
+    # read the cursor shape don't inherit a block.
+    _dot_vi_cursor_preexec() { print -n '\e[6 q'; }
+    add-zsh-hook preexec _dot_vi_cursor_preexec
+
+    # `vv` in command mode opens the current line in $EDITOR — the
+    # same thing Ctrl-X Ctrl-E does below, with a vi-ish binding.
+    bindkey -M vicmd 'vv' edit-command-line
 else
     bindkey -e
 fi
@@ -244,8 +315,8 @@ _dot_plugdir="${ZSH_CUSTOM:-$ZSH/custom}/plugins"
 if (( ! DOTFILES_IS_AGENT )); then
     # --- you-should-use: nags when you type a command that has an alias
     export YSU_MESSAGE_POSITION="after"
-    export YSU_HARDCORE=0            # Warn, don't refuse to run.
     export YSU_MODE=BESTMATCH        # Only show the single best alias.
+    unset YSU_HARDCORE
     _dot_source "$_dot_plugdir/you-should-use/you-should-use.plugin.zsh"
 
     # --- zsh-autosuggestions: greys out a suggestion from history
@@ -285,7 +356,7 @@ fi
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 
 # ============================================
-# 13. Syntax highlighting — MUST BE LAST
+# 13. Syntax highlighting — MUST BE LAST of the plugins
 # ============================================
 # This plugin wraps every ZLE widget that exists at the moment it
 # loads. Anything defining widgets after it will not be highlighted.
@@ -297,3 +368,32 @@ if (( ! DOTFILES_IS_AGENT )); then
 fi
 
 unset _dot_plugdir
+
+# ============================================
+# 14. Warp — subshell integration ("Warpify")
+# ============================================
+# MUST BE THE VERY LAST THING IN THIS FILE.
+#
+# Warp gets its block UI, its own input editor and its vi mode from
+# a shell-integration handshake. For the shell Warp starts itself
+# that handshake is automatic, but any shell Warp did NOT launch —
+# one behind ssh, inside docker/tmux, a `zsh` you ran by hand, or a
+# subshell — has to announce itself. This DCS sequence is that
+# announcement; Warp calls it "Warpify subshell".
+#
+# Why it lives at the end: the hook tells Warp the rc file is
+# finished and the prompt is about to appear. Emitted earlier it
+# races the rest of this file, and p10k's instant prompt (section 2)
+# would swallow it outright.
+#
+# Guards:
+#   TERM_PROGRAM   — only Warp understands this sequence. Every
+#                    other terminal would print mojibake.
+#   DOTFILES_IS_AGENT — agents parse stdout; never inject escapes.
+#   [[ -o interactive ]] and [ -t 1 ] — a real tty only, so the
+#                    sequence can never land in a captured pipe.
+if [[ $TERM_PROGRAM == WarpTerminal ]] \
+   && (( ! DOTFILES_IS_AGENT )) \
+   && [[ -o interactive ]] && [ -t 1 ]; then
+    printf '\eP$f{"hook": "SourcedRcFileForWarp", "value": { "shell": "zsh"}}\x9c'
+fi

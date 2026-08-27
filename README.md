@@ -753,9 +753,48 @@ brew install --cask warp
 > brew install --cask font-meslo-lg-nerd-font
 > ```
 
+**Subshell integration ("Warpify"):**
+
+Warp's block UI, its own input editor and its **vi mode** all depend on a
+shell-integration handshake. Warp does that automatically for the shell it
+launches itself, but a shell it did *not* launch — one behind `ssh`, inside
+Docker or tmux, or a `zsh` you started by hand — has to announce itself.
+
+`~/.zshrc` section 14 emits that announcement as the last thing it does:
+
+```zsh
+printf '\eP$f{"hook": "SourcedRcFileForWarp", "value": { "shell": "zsh" }}\x9c'
+```
+
+It is guarded on `TERM_PROGRAM == WarpTerminal`, on a real tty, and on not
+being an AI-agent shell, so no other terminal ever sees the escape sequence.
+
+**It must stay at the very end of the file.** The hook tells Warp the rc file
+has finished; emitted any earlier it races the rest of startup, and
+Powerlevel10k's instant prompt (section 2) swallows it outright.
+
+Two related gotchas, both of which break the handshake silently:
+
+- **Anything that writes to the terminal during startup.** A tool printing a
+  warning to stderr on every shell start is enough. This is why
+  `_ZO_DOCTOR=0` is set alongside the zoxide init in `os/macos.sh` — zoxide's
+  "initialize me last" advice is a false positive given the load order here,
+  but left enabled it wrote four lines on every single startup.
+- **Vi mode belongs to Warp, not zsh.** When the handshake succeeds, Warp's
+  own input editor handles keys and vi mode comes from
+  `text_editing.vim_mode_enabled` in `~/.warp/settings.toml`. When it fails,
+  Warp falls back to a plain PTY and zsh's own keymap takes over — so a
+  broken handshake looks like "vi mode stopped working" even though
+  `DOTFILES_VI_MODE` is untouched.
+
 **Verify:**
 
 Open a new Warp tab — you should see the Powerlevel10k prompt and all aliases working.
+
+```bash
+# Vi mode should report the vi keymap, not emacs:
+bindkey -lL main        # → bindkey -A viins main
+```
 
 ---
 
@@ -946,7 +985,7 @@ export JIRA_URL='https://yourcompany.atlassian.net/'
 export JIRA_PREFIX='PROJ'
 
 export DOTFILES_PYENV_SHIMS=1   # make pyenv authoritative for python3
-export DOTFILES_VI_MODE=1       # vi key bindings instead of emacs
+export DOTFILES_VI_MODE=0       # emacs key bindings (default is vi)
 ```
 
 > **Secrets:** prefer `aikeys` / `opkey` (1Password-backed, loaded on demand)
