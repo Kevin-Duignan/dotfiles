@@ -13,8 +13,11 @@
 # `name() {` and reports "syntax error near unexpected token `('". That bites
 # when an existing session re-sources this file after a pull, so drop any
 # colliding alias before defining anything.
+# NOTE: only list names that are DEFINED AS FUNCTIONS below. `dotfiles` was
+# in this list by mistake — it is a live alias from common/aliases.sh with no
+# function of the same name, so unaliasing it here just deleted it outright.
 for _fn_stale in dotsync dotsync-cp dotsync_cp ports-kill ports_kill \
-    dotfiles gbclean gswhv jira extract ua mkcd take serve backup up proj \
+    gbclean gswhv jira extract ua mkcd take serve backup up proj \
     vimi openi wfzf ffzf frg fbr fco fkill fzfdlog y batdiff; do
     unalias "$_fn_stale" 2>/dev/null
 done

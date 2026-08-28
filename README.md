@@ -1,39 +1,54 @@
 # 🗂️ .dotfiles
 
-A modular, multi-environment dotfiles repository that keeps macOS, Windows WSL, Windows Git Bash, and Windows MSYS2 in sync from a single source of truth.
+A modular, multi-environment dotfiles repository that keeps macOS, Windows WSL,
+Windows Git Bash, and Windows MSYS2 in sync from a single source of truth.
+Interactive Zsh starts in **~100ms**; the same config in a script or under an AI
+agent starts in **~8ms**.
+
+**Contents** — [Performance](#performance) · [How It Works](#how-it-works) ·
+[Prerequisites](#prerequisites) · [Installation](#installation) ·
+[Terminal Configuration](#terminal-configuration) ·
+[Machine-Specific Overrides](#machine-specific-overrides) ·
+[Alias Quick Reference](#alias-quick-reference) · [Vim](#vim) ·
+[Key Bindings](#key-bindings-zsh) · [Troubleshooting](#troubleshooting) ·
+[For AI Agents](#for-ai-agents) · [Updating](#updating)
 
 ```
 ~/.dotfiles/
 ├── .bashrc                 # Bash shell config (Git Bash / WSL fallback)
-├── .zshrc                  # Zsh shell config  (macOS / WSL / MSYS2)
-│                           #   Oh My Zsh's core is NOT loaded — plugins are
-│                           #   sourced directly for speed. See "Performance".
+├── .zshrc                  # Zsh shell config  (macOS / WSL / Linux / MSYS2)
+│                           #   Oh My Zsh's core is NOT loaded on any platform —
+│                           #   plugins are sourced directly. See "Performance".
 ├── .p10k.zsh               # Powerlevel10k prompt config (all Zsh envs)
 ├── .vimrc                  # Vim editor config (all environments)
 ├── install.sh              # Entry point — detects OS, sources everything
 │                           #   in a deliberate order (see comments in the file)
 ├── common/
-│   ├── env.sh              # PATH helpers, locale, XDG dirs, fzf config,
-│   │                       #   the shared _dot_cache_eval helper
+│   ├── env.sh              # _has_cmd, PATH helpers, locale, XDG dirs, fzf
+│   │                       #   config, the shared _dot_cache_eval helper
 │   ├── aliases.sh          # Cross-platform aliases (ls, git, docker, uv…)
-│   ├── functions.sh        # Cross-platform functions (extract, mkcd, yazi…)
+│   ├── functions.sh        # Cross-platform functions (extract, mkcd, yazi,
+│   │                       #   fzf pickers, jira, dotsync…)
 │   ├── lazy.sh             # Lazy loaders: AWS CodeArtifact, nvm, pyenv,
 │   │                       #   thefuck, conda — nothing here forks at startup
-│   ├── ai.sh                # Claude Code helpers, `devinfo`, 1Password-backed
+│   ├── ai.sh               # Claude Code helpers, `devinfo`, 1Password-backed
 │   │                       #   key loading, agent-safe execution helpers
 │   └── commitwell.sh       # Interactive git commit wizard (standalone script)
 ├── os/
-│   ├── macos.sh            # Homebrew (no fork), completion cache, macOS utils
+│   ├── macos.sh            # Homebrew (no fork), completion cache, MacVim,
+│   │                       #   cached zoxide/fzf/direnv init, macOS utils
 │   ├── wsl.sh              # Windows interop, clip.exe, wslpath helpers
 │   ├── gitbash.sh          # Minimal / fast-start config for Git Bash
 │   └── msys2.sh            # pacman, cygpath, cached tool inits, lazy nvm
 ├── tools/
-│   └── dotfiles-doctor     # bench / profile / trace / check / link / clean
+│   └── dotfiles-doctor     # bench / profile / trace / completions / clean /
+│                           #   check / link
 ├── claude/
 │   └── skills/
 │       └── kevin-shell-environment/   # Claude Code skill: teaches agents
 │                           #   which tools you prefer and where the sharp
 │                           #   edges are. Linked into ~/.claude/skills/.
+├── local.sh.example        # Template for the file below
 └── local.sh                # (create manually) Machine-specific overrides — git-ignored
 ```
 
@@ -41,9 +56,10 @@ A modular, multi-environment dotfiles repository that keeps macOS, Windows WSL, 
 
 ## Performance
 
-Interactive shell startup went from **~2.6 seconds to ~110-170ms** — a 15-20x
-speedup — without dropping any tool, alias or function. The three rules that
-keep it that way:
+Interactive shell startup went from **~2.6 seconds to ~95-105ms** — a 25x
+speedup — without dropping any tool, alias or function. Non-interactive shells
+(scripts, CI, AI agents) come in at **~8ms**. The three rules that keep it
+that way:
 
 1. **Never fork a subprocess at startup.** Anything that used to run
    `eval "$(tool init)"` on every shell now runs once, caches the output to
@@ -58,88 +74,106 @@ keep it that way:
    that cost time. `common/aliases.sh` inlines every alias a heavy Oh My Zsh
    plugin used to provide, without loading the plugin.
 
-AI coding agents (Claude Code, etc.) are detected via `$CLAUDECODE` and
-similar env vars and take an even faster path — no prompt, no syntax
-highlighting, no completions, since none of that is agent-visible. Aliases,
-functions and `$PATH` are identical either way.
+AI coding agents (Claude Code, Cursor, Aider) are detected via `$CLAUDECODE`
+and similar env vars and take an even faster path — no prompt, no syntax
+highlighting, no autosuggestions, no audited `compinit`, since none of that is
+agent-visible. Agents run every command through your login shell, so that
+saving compounds hard across a session. Aliases, functions and `$PATH` are
+identical either way.
 
 Check and benchmark your own setup any time:
 
 ```bash
-dotfiles-doctor check     # symlinks, syntax, tools, startup cost
-dotfiles-doctor bench     # 10-run startup benchmark
-dotfiles-doctor profile   # find what got slow (zprof)
+dotfiles-doctor check        # symlinks, syntax, tools, startup cost
+dotfiles-doctor bench        # 10-run startup benchmark
+dotfiles-doctor profile      # find what got slow (zprof)
+dotfiles-doctor trace        # line-by-line timing, slowest 30 lines
+dotfiles-doctor completions  # rebuild the tool completion cache
+dotfiles-doctor clean        # clear every cache, then `exec zsh`
 ```
+
+Or via the aliases: `dotdoctor`, `dotbench`.
 
 ---
 
 ## How It Works
 
-1. Your shell RC file (`~/.zshrc` or `~/.bashrc`) sets up the shell itself (prompt, history, key bindings, Oh My Zsh + plugins).
-2. At the very end it sources `~/.dotfiles/install.sh`.
-3. `install.sh` auto-detects the OS and loads:
-   - **`common/aliases.sh`** + **`common/functions.sh`** — shared across every environment.
-   - **`os/<detected>.sh`** — environment-specific config (Homebrew on macOS, `clip.exe` on WSL, etc.).
-   - **`local.sh`** (if it exists) — for secrets/tokens/machine-specific overrides that are never committed.
+1. Your shell RC file (`~/.zshrc` or `~/.bashrc`) sets up the shell itself — instant prompt, history, completions, key bindings.
+2. Partway through, it sources `~/.dotfiles/install.sh`.
+3. `install.sh` auto-detects the environment and loads, **in this order**:
+   - **`common/env.sh`** — first, because it defines `_has_cmd`, `_path_prepend` and `_dot_cache_eval`, which everything below depends on.
+   - **`common/aliases.sh`**, then **`common/functions.sh`** — so a function can override an alias of the same name.
+   - **`common/ai.sh`** — Claude Code shortcuts, `devinfo`, 1Password key loading.
+   - **`os/<detected>.sh`** — environment-specific config (Homebrew on macOS, `clip.exe` on WSL, `pacman` on MSYS2).
+   - **`common/lazy.sh`** — *after* the OS file, so the nvm and pyenv PATH shims land in front of Homebrew rather than behind it.
+   - **`local.sh`** (if it exists) — secrets, tokens and machine-specific overrides that are never committed.
+4. Back in `~/.zshrc`, the line-editor plugins and Powerlevel10k load — after `install.sh`, so syntax highlighting can see every alias and function.
 
-### Two-path `.zshrc`
+### Three startup paths
 
-The `.zshrc` is shared across macOS, WSL, and MSYS2, but it contains **two startup paths**:
+The `.zshrc` is shared across macOS, WSL, Linux and MSYS2. **Oh My Zsh's core
+is never loaded on any of them** — the handful of plugins worth having are
+sourced directly from `~/.oh-my-zsh/custom/plugins`, which skips OMZ's loader,
+`compaudit` and 20+ library files.
+
+What differs is *who* is running the shell:
 
 | Path | When | What loads |
 |------|------|------------|
-| **MSYS2 fast-path** | `uname -s` matches `MINGW*` or `MSYS*` | Cached `compinit`, P10k direct-load, 3 plugins sourced directly, cached fzf init, then `install.sh`. Oh My Zsh is **completely skipped**. |
-| **Standard path** | Everything else (macOS, WSL, Linux) | Full Oh My Zsh with all plugins, themes, and `source <(fzf --zsh)`. |
+| **Non-interactive** | `$-` has no `i` — scripts, `zsh -c`, scp/rsync, CI | `install.sh` only (env, aliases, functions, OS file, lazy stubs), then `return`. No prompt, completions or plugins. **~8ms.** |
+| **AI agent** | `$CLAUDECODE`, `$AI_AGENT`, `$CURSOR_TRACE_ID`, `$AIDER_MODEL`, or `$TERM_PROGRAM == vscode-agent` | Everything except the human-facing layer: unaudited `compinit -C`, a plain `%~ %#` prompt, and no autosuggestions / syntax highlighting / you-should-use. |
+| **Interactive** | Everything else | The full set: P10k instant prompt, audited `compinit` (once per 24h, byte-compiled), vi key bindings, `install.sh`, then the four plugins and Powerlevel10k. **~95-105ms.** |
 
-The fast-path exists because MSYS2's POSIX emulation layer makes every subprocess fork and file-stat 10–50× slower than on native Unix. Skipping OMZ and caching tool init scripts eliminates the biggest bottlenecks.
+Platform only changes two things: history size (50k on MSYS2, where NTFS makes
+a large history file slow to load; 1M elsewhere) and which `os/*.sh` file gets
+sourced.
 
 ```
-┌──────────────────────────────────────────────────────┐
-│  ~/.zshrc                                            │
-│                                                      │
-│  ┌─ P10k instant prompt ───────────────────────────┐ │
-│  │  (all platforms)                                 │ │
-│  └──────────────────────────────────────────────────┘ │
-│  ┌─ History config ────────────────────────────────┐ │
-│  │  MSYS2: 50k lines │ others: 10M lines           │ │
-│  └──────────────────────────────────────────────────┘ │
-│                                                      │
-│  if MSYS2:                    else (macOS/WSL/Linux): │
-│  ┌────────────────────┐      ┌──────────────────────┐│
-│  │ Cached compinit    │      │ Full Oh My Zsh       ││
-│  │ Vi-mode (bindkey)  │      │ 22 plugins           ││
-│  │ Colored man pages  │      │ P10k via OMZ theme   ││
-│  │ P10k direct-load   │      │ fzf / zoxide / eza   ││
-│  │ 3 plugins (direct) │      └──────────┬───────────┘│
-│  │ Cached fzf init    │                 │            │
-│  │ install.sh ────────┤                 │            │
-│  │ return (skip OMZ)  │                 │            │
-│  └────────────────────┘                 │            │
-│                                ┌────────▼──────────┐ │
-│                                │  install.sh       │ │
-│                                └───────────────────┘ │
-└──────────────────────────────────────────────────────┘
-
-         install.sh loads:
-   ┌─────────────────────────────────────┐
-   │  ┌───────────────────────────────┐  │
-   │  │  common/aliases.sh            │  │
-   │  │  common/functions.sh          │  │
-   │  └───────────────────────────────┘  │
-   │  ┌───────────────────────────────┐  │
-   │  │  os/macos.sh   ← Darwin      │  │
-   │  │  os/wsl.sh     ← Linux+WSL   │  │
-   │  │  os/gitbash.sh ← MINGW (no   │  │
-   │  │                   pacman)     │  │
-   │  │  os/msys2.sh   ← MINGW+MSYS  │  │
-   │  └───────────────────────────────┘  │
-   │  ┌───────────────────────────────┐  │
-   │  │  local.sh (if exists)         │  │
-   │  └───────────────────────────────┘  │
-   └─────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  ~/.zshrc                                                    │
+│                                                              │
+│  §0  non-interactive?  ──►  install.sh, return  (~8ms)       │
+│  §1  platform detect (via $OSTYPE — no fork)                 │
+│  §2  P10k instant prompt                                     │
+│  §3  cache helpers                                           │
+│  §4  agent detect  ──►  sets DOTFILES_IS_AGENT               │
+│  §5  history          (MSYS2: 50k │ others: 1M)              │
+│  §6  shell options                                           │
+│  §7  completions      (agent: -C │ human: audited, 24h TTL)  │
+│  §8  key bindings     (vi by default; DOTFILES_VI_MODE=0)    │
+│  §9  install.sh  ────────────────────────────┐               │
+│  §10 plugins          (skipped for agents)   │               │
+│  §11 prompt           (P10k │ agents: plain) │               │
+│  §12 ~/.zshrc.local                          │               │
+│  §13 syntax highlighting — MUST BE LAST      │               │
+│  §14 Warp subshell hook — MUST BE VERY LAST  │               │
+└──────────────────────────────────────────────┼───────────────┘
+                                               │
+         install.sh loads, in order:           │
+   ┌───────────────────────────────────────────▼─────┐
+   │  common/env.sh        ← _has_cmd, PATH, cache   │
+   │  common/aliases.sh                              │
+   │  common/functions.sh                            │
+   │  common/ai.sh                                   │
+   ├─────────────────────────────────────────────────┤
+   │  os/macos.sh    ← Darwin                        │
+   │  os/wsl.sh      ← Linux + $WSL_DISTRO_NAME      │
+   │  os/gitbash.sh  ← MINGW/CYGWIN, no pacman       │
+   │  os/msys2.sh    ← MINGW/MSYS with pacman        │
+   ├─────────────────────────────────────────────────┤
+   │  common/lazy.sh  ← LAST, so nvm/pyenv PATH wins │
+   │  local.sh        ← if it exists                 │
+   └─────────────────────────────────────────────────┘
 ```
 
-> **`commitwell.sh`** is a standalone Zsh script (not sourced). It is invoked via the `commit` alias.
+> **Plugins loaded (interactive, non-agent only):** `you-should-use`,
+> `zsh-autosuggestions`, Oh My Zsh's `aliases` plugin (gives you `als`, a
+> grouped alias cheatsheet), and `zsh-syntax-highlighting` — which must load
+> last, because it wraps every ZLE widget that exists at the moment it loads.
+
+> **`commitwell.sh`** is a standalone Zsh script, not sourced. Invoke it with
+> the `commitwell` alias.
+
 
 ---
 
@@ -165,7 +199,22 @@ The following tools are **expected** on every environment. All config files guar
 | **[procs](https://github.com/dalance/procs)** | Better `ps` replacement | `brew install procs` | `cargo install procs` | `winget install dalance.procs` |
 | **[xh](https://github.com/ducaale/xh)** | Fast HTTP client (`curl` alt) | `brew install xh` | `cargo install xh` | `winget install ducaale.xh` |
 | **[yazi](https://github.com/sxyazi/yazi)** | Terminal file manager | `brew install yazi` | Binary download / cargo | `winget install sxyazi.yazi` |
-| **[pre-commit](https://pre-commit.com/)** | Git hook framework (`commit`) | `brew install pre-commit` | `uv tool install pre-commit` | `uv tool install pre-commit` |
+| **[pre-commit](https://pre-commit.com/)** | Git hook framework | `brew install pre-commit` | `uv tool install pre-commit` | `uv tool install pre-commit` |
+| **[gh](https://cli.github.com/)** | GitHub CLI (`ghpr`, `ghrun`…) | `brew install gh` | `sudo apt install gh` | `winget install GitHub.cli` |
+
+Optional, but wired up if present:
+
+| Tool | Purpose | macOS |
+|------|---------|-------|
+| **[MacVim](https://macvim.org/)** | GUI Vim; `vim` is aliased to it | `brew install macvim` |
+| **[1Password CLI](https://developer.1password.com/docs/cli/)** | Backs `opkey` / `aikeys` / `opr` | `brew install --cask 1password-cli` |
+| **[jq](https://jqlang.github.io/jq/)** | `devinfo --pretty`, `jqp` | `brew install jq` |
+| **[direnv](https://direnv.net/)** | Per-directory env, cached init | `brew install direnv` |
+| **[atuin](https://atuin.sh/)** | Better shell history, cached init | `brew install atuin` |
+| **[lazygit](https://github.com/jesseduffield/lazygit)** / **[lazydocker](https://github.com/jesseduffield/lazydocker)** | `lg` / `ld` | `brew install lazygit lazydocker` |
+| **[btop](https://github.com/aristocratos/btop)** | Aliased over `top` | `brew install btop` |
+| **[tldr](https://tldr.sh/)** | Aliased to `?` | `brew install tldr` |
+| **[hyperfine](https://github.com/sharkdp/hyperfine)** | `bench` | `brew install hyperfine` |
 
 > **Windows note:** `winget` is pre-installed on Windows 10 (1709+) and Windows 11. It installs to system-wide paths and requires no admin for per-user packages. Git Bash is the exception — it uses a **portable download** that needs zero admin rights and zero package managers.
 
@@ -193,6 +242,11 @@ git clone https://github.com/Kevin-Duignan/dotfiles.git ~/.dotfiles
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 ```
 
+> Oh My Zsh is installed but **never loaded**. The `.zshrc` only uses it as a
+> place to keep plugins (`~/.oh-my-zsh/custom/plugins/`) plus its `aliases`
+> plugin, and sources those files directly. Its installer will offer to
+> overwrite `~/.zshrc` — that's fine, the symlink step below replaces it.
+
 **Install Powerlevel10k theme:**
 
 ```bash
@@ -209,12 +263,13 @@ git clone https://github.com/zsh-users/zsh-autosuggestions \
 git clone https://github.com/zsh-users/zsh-syntax-highlighting \
   "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting"
 
-git clone https://github.com/fdellwing/zsh-bat \
-  "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-bat"
-
-git clone https://github.com/MichaelAqworter-Andi/zsh-you-should-use \
+git clone https://github.com/MichaelAquilina/zsh-you-should-use.git \
   "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/you-should-use"
 ```
+
+> These three, plus Oh My Zsh's bundled `aliases` plugin, are the complete
+> plugin set — `.zshrc` section 10 sources exactly those and nothing else.
+> Note the destination directory is `you-should-use`, not `zsh-you-should-use`.
 
 **Install CLI tools via Homebrew:**
 
@@ -238,15 +293,27 @@ mkdir -p ~/.vim/{backup,swap,undo}
 **Symlink the config files:**
 
 ```bash
-# Back up any existing files first
+~/.dotfiles/tools/dotfiles-doctor link
+```
+
+That backs up any existing `~/.zshrc`, `~/.p10k.zsh`, `~/.vimrc` and `~/.bashrc`
+to `<name>.pre-dotfiles.<timestamp>`, symlinks the repo copies into `$HOME`, and
+links `claude/skills/*` into `~/.claude/skills/` so the shell-environment skill
+applies in every repo.
+
+<details>
+<summary>Or do it by hand</summary>
+
+```bash
 [ -f ~/.zshrc ]    && mv ~/.zshrc ~/.zshrc.bak
 [ -f ~/.p10k.zsh ] && mv ~/.p10k.zsh ~/.p10k.zsh.bak
 [ -f ~/.vimrc ]    && mv ~/.vimrc ~/.vimrc.bak
 
-ln -sf ~/.dotfiles/.zshrc    ~/.zshrc
-ln -sf ~/.dotfiles/.p10k.zsh ~/.p10k.zsh
-ln -sf ~/.dotfiles/.vimrc    ~/.vimrc
+ln -sfn ~/.dotfiles/.zshrc    ~/.zshrc
+ln -sfn ~/.dotfiles/.p10k.zsh ~/.p10k.zsh
+ln -sfn ~/.dotfiles/.vimrc    ~/.vimrc
 ```
+</details>
 
 **Install Vim plugins:**
 
@@ -291,6 +358,11 @@ chsh -s "$(which zsh)"
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 ```
 
+> Oh My Zsh is installed but **never loaded**. The `.zshrc` only uses it as a
+> place to keep plugins (`~/.oh-my-zsh/custom/plugins/`) plus its `aliases`
+> plugin, and sources those files directly. Its installer will offer to
+> overwrite `~/.zshrc` — that's fine, the symlink step below replaces it.
+
 **Install Powerlevel10k theme:**
 
 ```bash
@@ -307,12 +379,13 @@ git clone https://github.com/zsh-users/zsh-autosuggestions \
 git clone https://github.com/zsh-users/zsh-syntax-highlighting \
   "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting"
 
-git clone https://github.com/fdellwing/zsh-bat \
-  "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-bat"
-
-git clone https://github.com/MichaelAqworter-Andi/zsh-you-should-use \
+git clone https://github.com/MichaelAquilina/zsh-you-should-use.git \
   "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/you-should-use"
 ```
+
+> These three, plus Oh My Zsh's bundled `aliases` plugin, are the complete
+> plugin set — `.zshrc` section 10 sources exactly those and nothing else.
+> Note the destination directory is `you-should-use`, not `zsh-you-should-use`.
 
 **Install CLI tools:**
 
@@ -365,16 +438,11 @@ mkdir -p ~/.vim/{backup,swap,undo}
 **Symlink the config files:**
 
 ```bash
-[ -f ~/.zshrc ]    && mv ~/.zshrc ~/.zshrc.bak
-[ -f ~/.bashrc ]   && mv ~/.bashrc ~/.bashrc.bak
-[ -f ~/.p10k.zsh ] && mv ~/.p10k.zsh ~/.p10k.zsh.bak
-[ -f ~/.vimrc ]    && mv ~/.vimrc ~/.vimrc.bak
-
-ln -sf ~/.dotfiles/.zshrc    ~/.zshrc
-ln -sf ~/.dotfiles/.bashrc   ~/.bashrc
-ln -sf ~/.dotfiles/.p10k.zsh ~/.p10k.zsh
-ln -sf ~/.dotfiles/.vimrc    ~/.vimrc
+~/.dotfiles/tools/dotfiles-doctor link
 ```
+
+Same as on macOS: existing files are backed up to `<name>.pre-dotfiles.<timestamp>`
+before being replaced by symlinks.
 
 **Install Vim plugins:**
 
@@ -487,10 +555,11 @@ cp ~/.dotfiles/.bashrc ~/.bashrc
 cp ~/.dotfiles/.vimrc  ~/.vimrc
 ```
 
-> **Keeping in sync:** After a `git pull` inside `~/.dotfiles`, re-run the copy commands above to pick up changes. Or create a small helper alias in your `local.sh`:
-> ```bash
-> alias dfsync='cp ~/.dotfiles/.bashrc ~/.bashrc && cp ~/.dotfiles/.vimrc ~/.vimrc && source ~/.bashrc'
-> ```
+> **Keeping in sync:** once the dotfiles are loaded you get `dotsync-cp`, which
+> pulls the repo, re-copies the tracked files into `$HOME` and restarts the
+> shell. Use that instead of re-running the copy commands by hand. (`dotsync`
+> is the symlinking version — don't use it here, Git Bash can't make symlinks
+> without admin rights.)
 
 #### 3h. (Optional) Install Vim plugins
 
@@ -508,9 +577,9 @@ Close and reopen `git-bash.exe`. You should see your custom prompt and all share
 
 ---
 
-### 4 · Windows MSYS2 (Zsh — Lightweight, No Oh My Zsh)
+### 4 · Windows MSYS2 (Zsh — Lightweight)
 
-> **Why MSYS2 over Git Bash?** MSYS2 gives you `pacman`, a real package manager, plus Zsh with autosuggestions, syntax highlighting, Powerlevel10k, fzf, zoxide — a full-featured dev shell on Windows. But MSYS2's POSIX emulation layer makes subprocess forks 10–50× slower than native Unix, so the `.zshrc` uses a **lightweight fast-path** that skips Oh My Zsh entirely while still providing the features that matter.
+> **Why MSYS2 over Git Bash?** MSYS2 gives you `pacman`, a real package manager, plus Zsh with autosuggestions, syntax highlighting, Powerlevel10k, fzf and zoxide — a full-featured dev shell on Windows. MSYS2's POSIX emulation layer makes subprocess forks 10–50× slower than native Unix, which is exactly the cost this config is built to avoid, so it holds up here.
 
 #### What you get (vs Git Bash)
 
@@ -524,22 +593,47 @@ Close and reopen `git-bash.exe`. You should see your custom prompt and all share
 | Fuzzy finder | Manual binary | **fzf** with keybindings + cached init |
 | Smart cd | Manual binary | **zoxide** with cached init |
 | Package manager | ✗ | **pacman** |
-| Completions | Basic | **Zsh compinit** (cached, once per day) |
-| Vi-mode | ✗ | **✓** (bindkey -v) |
-| Colored man pages | ✗ | **✓** (LESS_TERMCAP) |
-| nvm / node | ✗ | **✓** (lazy-loaded — zero startup cost) |
+| Completions | Basic | **Zsh compinit** (cached, audited once a day) |
+| Vi-mode | ✗ | **✓** (`bindkey -v`, with cursor-shape feedback) |
+| Colored man pages | ✗ | **✓** (`bat` as `MANPAGER`) |
+| nvm / node | ✗ | **✓** (default version on PATH; `nvm` itself lazy) |
 
-#### How the fast-path works
+#### What makes it fast
 
-Instead of loading Oh My Zsh (which sources 15+ library files and runs `compinit` with security checks), the `.zshrc` MSYS2 fast-path:
+MSYS2's POSIX emulation layer makes every subprocess fork and file-stat 10–50×
+slower than on native Unix, so anything that shells out at startup hurts far
+more here than on macOS. The same techniques the rest of this repo uses just
+matter more:
 
-1. **Caches `compinit`** — only regenerates `~/.zcompdump` once per day; all other startups use `-C` (skip security scan).
-2. **Loads P10k directly** — sources the theme file without the OMZ theme engine.
-3. **Sources 3 plugins directly** — `zsh-autosuggestions`, `zsh-syntax-highlighting`, `you-should-use` — no plugin loader overhead.
-4. **Caches fzf init** — runs `fzf --zsh` once and caches the output to `~/.cache/fzf-init.zsh`; re-sources from cache on every startup.
-5. **Caches tool init scripts** — `zoxide init zsh`, `uv generate-shell-completion zsh`, `pyenv init -` all get cached to `~/.cache/dotfiles/*.zsh` and only regenerated when the binary changes.
-6. **Lazy-loads nvm** — `nvm.sh` is only sourced the first time you run `nvm`, `node`, `npm`, or `npx` (saves 1–2s).
-7. **Uses `$commands[]`** — Zsh's built-in hash table for instant tool detection instead of `command -v` (which scans the entire `$PATH` on every call).
+1. **Oh My Zsh is never loaded** — on any platform, MSYS2 included. The four
+   plugins are sourced directly, skipping OMZ's loader, `compaudit` and 20+
+   library files.
+2. **`compinit` is cached** — the full audited run happens once every 24 hours;
+   every other startup uses `-C`, which skips the security scan. The dump is
+   byte-compiled in the background.
+3. **P10k loads directly** — sourced from `$ZSH_CUSTOM/themes/`, not through
+   OMZ's theme engine.
+4. **Tool init scripts are cached** — `zoxide init zsh`, `fzf --zsh` and
+   `uv generate-shell-completion zsh` run once into `~/.cache/zsh/` and are
+   re-sourced from there, regenerating only when the binary is newer.
+5. **nvm is not sourced at all** — `common/lazy.sh` puts the default Node
+   version's `bin` directly on `PATH`, so `node`/`npm`/`npx` are instant, and
+   only the `nvm` command itself pays the ~700ms load on first use.
+6. **`$commands[]` for tool detection** — Zsh's built-in hash table, rather than
+   `command -v`, which scans the entire `$PATH` on every call.
+7. **Smaller history** — 50k lines instead of 1M, because NTFS makes a large
+   history file slow to load.
+
+`os/msys2.sh` adds the MSYS2-only pieces on top: `MSYS_NO_PATHCONV` and
+`MSYS2_ARG_CONV_EXCL` so arguments starting with `/` aren't mangled,
+`GIT_DISCOVERY_ACROSS_FILESYSTEM` for git on NTFS, `pacman` aliases, and
+`towinpath` / `tounixpath`.
+
+> **Native Windows tools:** `eza`, `bat` and friends installed via `winget` are
+> native Windows binaries — they don't understand `/c/Users/...` paths. On MSYS2
+> the `ls`/`ll`/`la`/`lt`/`cat` wrappers route their arguments through `cygpath`
+> first (`_win_wrap` in `common/aliases.sh`), so those commands take Unix paths
+> like everywhere else.
 
 #### Installation
 
@@ -629,7 +723,11 @@ git clone https://github.com/MichaelAquilina/zsh-you-should-use.git \
   "$ZSH_CUSTOM/plugins/you-should-use"
 ```
 
-> **Note:** Oh My Zsh itself is **not** installed on MSYS2. The `.zshrc` fast-path sources P10k and plugins directly from the `$ZSH_CUSTOM` directory structure. The `zsh-bat` plugin is also not needed — `bat` is used directly via the `cat` alias in `common/aliases.sh`.
+> **Note:** Oh My Zsh itself is **not** installed on MSYS2 — only the directory
+> layout it expects. `.zshrc` sources P10k and the plugins directly out of
+> `$ZSH_CUSTOM`, so the OMZ installer is unnecessary here. The one thing you
+> give up versus macOS/WSL is the `aliases` plugin's `als` cheatsheet, which
+> ships with Oh My Zsh rather than as a standalone repo.
 
 **Install vim-plug:**
 
@@ -656,11 +754,10 @@ cp ~/.dotfiles/.p10k.zsh ~/.p10k.zsh
 cp ~/.dotfiles/.vimrc    ~/.vimrc
 ```
 
-> **Keeping in sync:** After a `git pull` inside `~/.dotfiles`, re-run the copy commands above to pick up changes. Or add a helper alias in your `local.sh`:
-> ```bash
-> alias dfsync='cp ~/.dotfiles/.zshrc ~/.zshrc && cp ~/.dotfiles/.p10k.zsh ~/.p10k.zsh && cp ~/.dotfiles/.vimrc ~/.vimrc && rm -rf ~/.cache/dotfiles ~/.cache/fzf-init.zsh && source ~/.zshrc'
-> ```
-> The `dfsync` alias also clears the cached tool init scripts so they get regenerated on the next shell startup.
+> **Keeping in sync:** use `dotsync-cp` — it pulls the repo, re-copies the
+> tracked files into `$HOME` and `exec zsh`s. If a tool was upgraded and its
+> cached init looks stale, run `dotfiles-doctor clean` first to clear
+> `~/.cache/zsh/`.
 
 **Install Vim plugins:**
 
@@ -703,17 +800,30 @@ exec zsh
 Open a new shell and check that everything loaded:
 
 ```bash
-# Should print "macos", "wsl", "gitbash", or "msys2"
+# Should print "macos", "wsl", "gitbash", "msys2" or "linux"
 echo $DOTFILES_OS
 
 # Test a shared alias
-gs   # → git status
+gst   # → git status
 
 # Test uv
 uv --version
 
 # Test the commit wizard (requires staged changes)
-commit
+commitwell
+
+# Full health check: symlinks, syntax, tools, startup cost
+dotdoctor
+```
+
+`devinfo` prints the whole environment as JSON — OS, git context, Python/Node
+versions, which tools are installed, whether a CodeArtifact token is loaded.
+`devinfo --pretty` pipes it through `jq`.
+
+```bash
+als          # grouped cheatsheet of every alias currently defined
+als -g git   # just the git group
+als docker   # search aliases matching a keyword
 ```
 
 ---
@@ -948,7 +1058,7 @@ Open each profile as a new tab and confirm:
 
 ```bash
 echo $DOTFILES_OS   # Should print "wsl", "gitbash", or "msys2"
-gs                   # git status should work
+gst                  # git status should work
 uv --version         # uv should be found
 ```
 
@@ -963,8 +1073,15 @@ anything set there overrides the generic defaults in `common/`.
 
 ```bash
 cp ~/.dotfiles/local.sh.example ~/.dotfiles/local.sh
-$EDITOR ~/.dotfiles/local.sh
+$EDITOR ~/.dotfiles/local.sh          # or just: zshloc for ~/.zshrc.local
 ```
+
+There are **two** override hooks, both optional and both gitignored:
+
+| File | Sourced by | Use it for |
+|------|-----------|------------|
+| `~/.dotfiles/local.sh` | `install.sh`, last | Anything every shell needs: tokens, `$PATH`, org config. Works in Bash and Zsh. |
+| `~/.zshrc.local` | `~/.zshrc` section 12 | Zsh-only, interactive-only settings — `bindkey`, `zstyle`, prompt tweaks. |
 
 The config degrades gracefully when it's absent — a fresh clone works
 immediately, it just won't have your Jira or private package index wired up:
@@ -972,7 +1089,7 @@ immediately, it just won't have your Jira or private package index wired up:
 | Unset value | Effect |
 |---|---|
 | `CODEARTIFACT_DOMAIN` / `_OWNER` / `_PROFILE` | `pip`/`uv`/`poetry`/`twine` pass straight through to the real tool; no token fetch, no network call |
-| `JIRA_URL` / `JIRA_PREFIX` | `jira` and `gswhv` print how to configure themselves instead of failing |
+| `JIRA_URL` / `JIRA_PREFIX` / `JIRA_NAME` | `jira` and `gswhv` print how to configure themselves instead of failing |
 | `OP_ANTHROPIC_REF` / `OP_OPENAI_REF` | `aikeys` explains what to set |
 
 ```bash
@@ -995,76 +1112,388 @@ export DOTFILES_VI_MODE=0       # emacs key bindings (default is vi)
 
 ## Alias Quick Reference
 
-### Shared (all environments)
+Not exhaustive — run `als` for the live, grouped list of everything currently
+defined, or `als -g git` / `als <keyword>` to narrow it. Everything below is
+guarded by a `_has_cmd` check, so an alias only exists if its tool does.
+
+### Files and navigation
 
 | Alias | Command |
 |-------|---------|
-| `gs` | `git status` |
-| `ga` / `gaa` | `git add` / `git add --all` |
-| `gcm "msg"` | `git commit -m "msg"` |
-| `gp` / `gpl` | `git push` / `git pull` |
-| `gl` | `git log --oneline --graph --decorate -20` |
-| `gd` / `gds` | `git diff` / `git diff --staged` |
-| `commit` | Interactive commit wizard (`commitwell.sh`) |
-| `ls` / `ll` / `la` / `lt` | `eza` (falls back to plain `ls`) |
-| `cat` | `bat --paging=never` |
-| `cd` | `zoxide` (`z`) |
-| `uvs` / `uva` / `uvr` | `uv sync` / `uv add` / `uv remove` |
-| `uvpi` / `uvpu` | `uv pip install` / `uv pip install --upgrade` |
-| `uvrun` | `uv run` |
-| `dcu` / `dcd` / `dcl` | `docker compose up -d` / `down` / `logs -f` |
-| `extract <file>` | Auto-detect & extract any archive |
-| `mkcd <dir>` | `mkdir -p` + `cd` in one step |
-| `serve [port]` | Python HTTP server (default port 8000) |
-| `y [dir]` | Yazi file manager with `cd`-on-exit |
+| `ls` / `ll` / `la` | `eza` — plain / long+all+git / all |
+| `lt` / `lt3` / `ltg` | `eza --tree` at depth 2 / depth 3 / depth 2 respecting `.gitignore` |
+| `lsd` / `lsm` / `lss` | directories only / newest first / largest first |
+| `cat` | `bat -pp` (plain, no paging — byte-identical to `cat` for pipes) |
+| `batp` / `bathelp` | the pretty paged `bat` / `bat` for `--help` output |
+| `cd` / `cdi` | `zoxide`'s `z` / interactive picker `zi` |
+| `..` / `...` / `....` / `.....` | up 1–4 directories |
+| `-` | `cd -` |
+| `d` | `dirs -v` — numbered directory stack |
+| `up [n]` | go up n directories (default 1) |
+| `mkcd <dir>` / `take <dir>` | `mkdir -p` + `cd` in one step |
+| `mkdir` / `mv` / `cp` / `rm` / `ln` | the same tools, with `-pv` / `-i` |
+| `xc` | `xcp` — fast parallel copy |
+| `trash` | `rip` — recoverable delete |
+| `dus` / `dfh` / `pss` | `dust` / `duf` / `procs` |
+| `extract <file>` | Unpack any archive (tar, zip, 7z, rar, zst…) |
+| `ua <archive> <files…>` | The reverse — compress by extension |
+| `backup <file>` | Timestamped copy alongside the original |
+| `y [dir]` | Yazi file manager, `cd`s to wherever you quit |
 
-### macOS Only
+> `grep`, `sed`, `find`, `ps` and `du` are **deliberately not shadowed** — their
+> replacements have incompatible interfaces and would break scripts. The fast
+> versions live under their own names (`rg`, `sd`, `fd`, `pss`, `dus`).
+
+### Search
 
 | Alias | Command |
 |-------|---------|
-| `bup` | `brew update && upgrade && cleanup` |
-| `bin` / `bun` | `brew install` / `brew uninstall` |
-| `clip` / `paste` | `pbcopy` / `pbpaste` |
-| `flushdns` | Flush macOS DNS cache |
-| `showfiles` / `hidefiles` | Toggle hidden files in Finder |
-| `cleanup` | Remove all `.DS_Store` files recursively |
-| `afk` | Lock the screen |
+| `rga` / `rgi` | `rg --hidden --no-ignore` / `rg --ignore-case` |
+| `rgf` / `rgl` / `rgc` | list files / files-with-matches / count |
+| `hs` / `hsi` | search shell history (case-sensitive / insensitive) |
+| `ffzf` | fuzzy file picker with a `bat` preview |
+| `frg [pattern]` | ripgrep contents → pick a match → open it at that line |
+| `fbr` / `fco` | fuzzy-pick a branch to switch to / a commit to show |
+| `fkill` | fuzzy-pick a process and kill it |
+| `vimi` / `openi` | fzf-pick a file, open in `$EDITOR` / open with the OS |
+| `wfzf <cmd>` | fzf-pick file(s), pass them to `<cmd>` |
+| `proj` | fzf-jump to a repo under `$PROJECTS_DIR` (default `~/Developer`) |
 
-### WSL Only
+### Git
+
+Inlined from the Oh My Zsh git plugin — the plugin itself is never loaded.
+
+| Alias | Command |
+|-------|---------|
+| `g` | `git` |
+| `gst` / `gss` / `gsb` | `git status` / `--short` / `--short --branch` |
+| `ga` / `gaa` / `gau` / `gap` | `git add` / `--all` / `--update` / `--patch` |
+| `gc` / `gca` | `git commit --verbose` / `--verbose --all` |
+| `gcmsg "msg"` / `gcam "msg"` | `git commit -m` / `git commit -am` |
+| `gc!` / `gca!` / `gcn` / `gcn!` | amend / amend all / no-edit / no-edit amend |
+| `gcf` | `git commit --fixup` |
+| `gco` / `gcb` | `git checkout` / `git checkout -b` |
+| `gcm` / `gcd` | check out the **main** / **develop** branch |
+| `gsw` / `gswc` / `gswm` / `gswd` | `git switch` / `--create` / to main / to develop |
+| `gd` / `gds` / `gdw` / `gdst` | `git diff` / `--staged` / `--word-diff` / `--stat` |
+| `gl` / `gpr` / `gpra` | `git pull` / `--rebase` / `--rebase --autostash` |
+| `gprom` / `gproma` | pull-rebase from `origin/main` (`a` = autostash) |
+| `gp` / `gpf` / `gpf!` | `git push` / `--force-with-lease` / `--force` |
+| `gpsup` | `git push --set-upstream origin <current-branch>` |
+| `gf` / `gfa` / `gfo` | `git fetch` / `--all --tags --prune` / `origin` |
+| `glog` / `gloga` / `glo` | `git log --oneline --decorate --graph` (`a` = `--all`) |
+| `glol` / `glola` | pretty graph log (`a` = `--all`) |
+| `glg` / `glp` / `gld` | log `--stat` / `--patch` / since 1 day ago |
+| `gm` / `gma` / `gmc` / `gms` | `git merge` / `--abort` / `--continue` / `--squash` |
+| `grb` / `grba` / `grbc` / `grbi` | `git rebase` / `--abort` / `--continue` / `-i` |
+| `grbm` / `grbom` / `grbd` | rebase onto main / `origin/main` / develop |
+| `grh` / `grhh` / `grhs` | `git reset` / `--hard` / `--soft` |
+| `grs` / `grst` / `grss` | `git restore` / `--staged` / `--source` |
+| `gsta` / `gstp` / `gstl` / `gstd` | stash push / pop / list / drop |
+| `gb` / `gba` / `gbd` / `gbD` | `git branch` / `-a` / `-d` / `-D` |
+| `gbl` / `gsh` / `grf` | `git blame -w` / `git show` / `git reflog` |
+| `gcp` / `gcpa` / `gcpc` | cherry-pick / `--abort` / `--continue` |
+| `gwt` / `gwta` / `gwtl` / `gwtrm` | `git worktree` add / list / remove |
+| `grt` | `cd` to the repo root |
+| `gclean` / `gbclean` | interactive clean / delete branches whose remote is gone |
+| `batdiff` | `bat --diff` over every changed file |
+| `commitwell` | Interactive commit wizard (`common/commitwell.sh`) |
+
+**GitHub CLI** (`gh` installed): `ghpr` / `ghprv` / `ghprl` / `ghprc` / `ghprs`
+/ `ghprm` (PR create / view / list / checkout / status / merge), `ghrv`
+(review), `ghis` / `ghisv` (issues), `ghrun` / `ghwatch` (Actions).
+
+**Jira** (needs `JIRA_URL` / `JIRA_PREFIX` in `local.sh`): `jira` opens your
+dashboard, `jira 1234` opens `<PREFIX>-1234`, `jira .` opens the ticket named by
+the current branch. `gswhv 1234` creates or switches to the branch
+`<PREFIX>-1234`.
+
+### Python
+
+| Alias | Command |
+|-------|---------|
+| `py` / `python` / `pyver` | `python3` / `python3` / `python3 --version` |
+| `pyfind` / `pygrep` | `fd -e py` / `rg --type py` |
+| `pyclean` | Delete every `__pycache__` and `.pyc` recursively |
+| `va` / `vd` / `vc` | activate `.venv` / `deactivate` / create + activate |
+| `uvs` / `uva` / `uvr` / `uvl` | `uv sync` / `add` / `remove` / `lock` |
+| `uvpi` / `uvpu` / `uvv` | `uv pip install` / `install --upgrade` / `uv venv` |
+| `uvrun` / `uvt` / `uvtx` | `uv run` / `uv run pytest` / `pytest -x` |
+| `uvfmt` / `uvlint` | `uv run ruff format` / `ruff check --fix` |
+| `rf` / `rc` | `ruff format` / `ruff check --fix` |
+| `pt` / `ptx` / `ptv` / `ptl` / `ptk` | `pytest` / `-x` / `-v` / `--last-failed` / `-k` |
+| `pipi` / `pipu` / `pipun` / `piplo` | pip install / upgrade / uninstall / list outdated |
+| `serve [port]` | Static HTTP server in the current directory (default 8000) |
+
+### Node, Docker, Make
+
+| Alias | Command |
+|-------|---------|
+| `ni` / `nid` / `nig` / `nun` | `npm install` / `-D` / `-g` / `uninstall` |
+| `nrb` / `nrd` / `nrs` / `nrt` / `nrl` | `npm run` build / dev / start / test / lint |
+| `nls` / `nout` | `npm list --depth=0` / `npm outdated` |
+| `pn` / `pni` / `pnd` | `pnpm` / `pnpm install` / `pnpm dev` |
+| `dps` / `dpa` / `di` | formatted `docker ps` / `ps -a` / `images` |
+| `dex` / `dlog` / `dstop` / `dprune` | exec -it / logs -f / stop all / full prune |
+| `dc` / `dcu` / `dcub` / `dcd` / `dcdv` | `docker compose` / up -d / up -d --build / down / down -v |
+| `dcl` / `dcp` / `dcr` / `dce` / `dcb` | logs -f / ps / restart / exec / build |
+| `fzfdlog` | fzf-pick a compose service and tail its logs |
+| `mdp` / `mdu` / `mdb` / `mdd` | `make dev-prompt` / `dev-up` / `dev-build` / `dev-down` |
+| `mga` / `mt` / `ml` | `make generate-apis` / `test` / `lint` |
+
+### Shell, config and dotfiles
+
+| Alias | Command |
+|-------|---------|
+| `c` / `h` / `j` | `clear` / `history` / `jobs -l` |
+| `path` | `$PATH`, one entry per line |
+| `ports` / `ports-kill <port>` | list listeners / kill whatever holds a port |
+| `myip` / `now` / `week` | public IP / timestamp / ISO week number |
+| `reload` / `rl` | `exec zsh` — a clean restart, never a re-source |
+| `zshrc` / `bashrc` / `vimrc` | Edit the shell / vim config |
+| `zshenv` / `zshals` / `zshfunc` / `zshlazy` / `zshai` | Edit the matching `common/*.sh` |
+| `zshloc` / `p10k-cfg` | Edit `~/.zshrc.local` / `.p10k.zsh` |
+| `dotfiles` / `dotpull` | `cd` to the repo / `git pull` it |
+| `dotdoctor` / `dotbench` | `dotfiles-doctor` / `dotfiles-doctor bench` |
+| `dotsync` | Pull, re-symlink into `$HOME`, restart the shell |
+| `dotsync-cp` | Same, but copies — for Git Bash and MSYS2 |
+| `copypath` / `copyfile <f>` | Copy `$PWD` / a file's contents to the clipboard |
+| `lg` / `ld` / `top` / `htp` | `lazygit` / `lazydocker` / `btop` / `htop` |
+| `?` / `jqp` / `bench` | `tldr` / `jq -C . \| less -R` / `hyperfine` |
+
+### AI helpers (`common/ai.sh`)
 
 | Alias / Function | Description |
 |-------------------|-------------|
-| `cdwin` / `cddl` / `cddesk` | Navigate to Windows home/Downloads/Desktop |
-| `clip` / `paste` | `clip.exe` / `powershell Get-Clipboard` |
-| `open <path>` | Open in Windows Explorer |
-| `wopen [path]` | Open path in Explorer via `wslpath` |
+| `cl` / `clc` / `clr` / `clp` | `claude` / `--continue` / `--resume` / `--print` |
+| `clyolo` | `claude --dangerously-skip-permissions` |
+| `clhere` | Start Claude with the **repo root** as the working directory |
+| `cldiff` / `clfix` / `clask` / `clcommit` | Claude over the current diff / a failure / a question / a commit message |
+| `devinfo [--pretty]` | The whole environment as JSON — OS, git, tool versions |
+| `ctx` | Compact snapshot of cwd, branch, dirty files, recent commits |
+| `opkey VAR op://…` / `aikeys` | Load a secret / your AI API keys from 1Password |
+| `opr <cmd>` | `op run --` — inject secrets for one command only |
+| `noalias <cmd>` | Run a command with aliases bypassed |
+| `rawshell` | A subshell with no aliases or functions, for bisecting config |
+
+### Lazy loaders (`common/lazy.sh`)
+
+Nothing here costs anything at startup — each is a stub that replaces itself on
+first use.
+
+| Command | Description |
+|---------|-------------|
+| `ca-token` / `ca-refresh` / `ca-clear` | AWS CodeArtifact token — fetched on demand, cached 11h |
+| `pip` / `pip3` / `uv` / `poetry` / `twine` | Wrappers that fetch a token first, only when one is needed |
+| `nvm` | Lazy — but `node` / `npm` / `npx` are on `PATH` immediately |
+| `pyenv` | Lazy, and **off `PATH`** unless `DOTFILES_PYENV_SHIMS=1` |
+| `fuck` / `FUCK` | `thefuck`, lazy |
+| `conda` | Lazy, if miniconda/anaconda is installed |
+
+### macOS only
+
+| Alias | Command |
+|-------|---------|
+| `vim` / `gvim` | **MacVim GUI**, reusing the existing window as a new tab |
+| `vimt` | `command vim` — the blocking, in-terminal build |
+| `gvimrc` | Edit `~/.gvimrc` in MacVim |
+| `o` / `oo` / `finder` | `open` / `open .` / open the current dir in Finder |
+| `ql <file>` | Quick Look a file from the terminal |
+| `clip` / `paste` | `pbcopy` / `pbpaste` |
+| `flushdns` | Flush the macOS DNS cache |
+| `showfiles` / `hidefiles` | Toggle hidden files in Finder |
+| `cleanup` | Remove every `.DS_Store` recursively |
+| `emptytrash` | Empty the trash on all volumes, plus system logs |
+| `afk` / `sleepnow` | Lock the screen / sleep immediately |
+| `battery` / `caff` | `pmset -g batt` / `caffeinate -dimsu` until Ctrl-C |
+| `awsw` / `awsl` / `awsp` | `aws sts get-caller-identity` / `aws sso login --profile` / print `$AWS_PROFILE` |
+| `bup` | `brew update && brew upgrade && brew cleanup` |
+| `bi` / `bun` / `br` | `brew install` / `uninstall` / `reinstall` |
+| `bcin` / `bcup` / `bcl` | `brew install --cask` / `upgrade --cask` / `list --cask` |
+| `bl` / `bo` / `binf` / `bs` | `brew list` / `outdated` / `info` / `search` |
+| `bson` / `bsoff` / `bsl` | `brew services` start / stop / list |
+| `bcn` / `ba` / `bdr` | `brew cleanup` / `autoremove` / `doctor` |
+
+> **Why `vim` opens MacVim:** Homebrew's `macvim` formula installs a terminal
+> build of `vim` at `/opt/homebrew/bin/vim` *as well as* the `.app`, so `vim`
+> runs MacVim either way — the alias just picks the GUI. `$EDITOR`, `$VISUAL`
+> and `$GIT_EDITOR` are pinned to the full path of the **terminal** binary,
+> because git and `edit-command-line` need an editor that blocks, which
+> `mvim --remote-silent-tab` does not.
+
+### WSL only
+
+| Alias / Function | Description |
+|-------------------|-------------|
+| `cdwin` / `cddl` / `cddesk` / `cddocs` | Navigate to Windows home / Downloads / Desktop / Documents |
+| `clip` / `paste` (and `pbcopy` / `pbpaste`) | `clip.exe` / `powershell Get-Clipboard` |
+| `open` / `explorer` | Open in Windows Explorer |
+| `notepad` / `code` | The Windows-native binaries |
+| `wopen [path]` | Open a path in Explorer, converting it via `wslpath` |
 | `wpath <path>` | Convert between WSL ↔ Windows paths |
 
-### Git Bash Only (minimal)
+### Git Bash only (minimal)
 
 | Alias | Description |
 |-------|-------------|
-| `cdwin` / `cddl` | Navigate to `C:\Users\Kevin-Duignan` paths |
+| `cdwin` / `cddl` / `cddesk` / `cddocs` | Navigate to your Windows profile directories |
 | `clip` / `paste` | `clip.exe` / `powershell Get-Clipboard` |
 | `open [path]` | Open in Explorer |
+| `rl` / `shrc` | `exec bash` / edit `~/.bashrc` |
 
-> **`cd` / `z` (zoxide):** not bundled with Git Bash — no package manager ships it automatically. Install it manually (see [step 3c](#3-windows-git-bash-bash--minimal-fast-start)) to get smart `cd` support.
+> **`cd` / `z` (zoxide):** not bundled with Git Bash — no package manager ships
+> it automatically. Install it manually (see [step 3c](#3c-optional-install-zoxide-smarter-cd))
+> to get smart `cd` support.
 
-### MSYS2 Only
+### MSYS2 only
 
 | Alias | Description |
 |-------|-------------|
-| `pacs` / `paci` / `pacr` / `pacu` | pacman search / install / remove / update |
+| `pacs` / `paci` / `pacr` / `pacu` | pacman search / install / remove / full update |
+| `pacl` / `pacinfo` | List installed / package info |
 | `towinpath` / `tounixpath` | Path conversion helpers |
+| `open [path]` | Open in Explorer |
+
+---
+
+## Vim
+
+`.vimrc` is shared across every environment and splits on `$MSYSTEM`, which
+MSYS2 and Git Bash set. Both get the lightweight plugins; everything else gets
+the full stack, because Vim's file I/O is slow under Windows POSIX emulation.
+
+Leader is `<Space>`. Plugins load only if vim-plug is present, so the config
+works fine with none installed.
+
+| | Plugins |
+|---|---|
+| **Everywhere** | `vim-commentary`, `vim-surround`, `vim-unimpaired`, `auto-pairs`, `vim-fugitive`, `vim-gitgutter` |
+| **macOS / WSL / Linux only** | `ale`, `nerdtree`, `vim-lsp` + `vim-lsp-settings`, `asyncomplete`, `lightline`, `fzf` + `fzf.vim`, `vim-indent-guides`, `vim-easymotion`, `quick-scope`, `vim-polyglot` |
+
+Backup, swap and undo files go to `~/.vim/{backup,swap,undo}` — create those
+directories or Vim will complain on every write.
+
+```bash
+vim +PlugInstall +qall     # install
+vim +PlugUpdate  +qall     # update
+```
+
+---
+
+## Key Bindings (Zsh)
+
+Vi bindings are the default. Set `DOTFILES_VI_MODE=0` in `local.sh` for emacs
+bindings.
+
+| Key | Action |
+|-----|--------|
+| `Esc` | Command mode — `KEYTIMEOUT=1`, so it's instant, not sluggish |
+| Cursor shape | Steady block in command mode, beam in insert mode |
+| `ci"`, `da(`, `cs'"`, `ys` | Text objects and surround, on the command line |
+| `vv` (command mode) | Edit the current line in `$EDITOR` |
+| `Ctrl-X Ctrl-E` | The same thing, in either keymap |
+| `Ctrl-A` / `Ctrl-E` | Start / end of line — kept in **both** keymaps |
+| `Ctrl-R` / `Ctrl-S` | Incremental history search back / forward |
+| `Ctrl-W` / `Ctrl-U` / `Ctrl-K` | Kill word back / line back / line forward |
+| `↑` / `↓` | History search using what you've already typed |
+| `Ctrl-←` / `Ctrl-→` | Move by word |
+| `Ctrl-Space` | Accept the current autosuggestion |
+
+`AUTO_CD` is on, so a bare directory name is a `cd`. History is shared live
+across sessions, and a leading space keeps a command out of it.
+
+---
+
+## Troubleshooting
+
+**A command behaves unexpectedly.** An alias may be shadowing it. `ls`, `cat`
+and `cd` are the ones that shadow real tools.
+
+```bash
+which -a ls        # what's actually being run
+noalias ls -la     # run the real binary once
+\ls                # same, zsh shorthand
+rawshell           # a subshell with no aliases or functions at all
+```
+
+**Startup got slow.**
+
+```bash
+dotfiles-doctor bench      # is it actually slow?
+dotfiles-doctor profile    # zprof: slowest functions by self time
+dotfiles-doctor trace      # slowest 30 lines
+```
+
+The usual cause is something new that forks at startup. Cache it with
+`_dot_cache_eval`, or make it a lazy stub in `common/lazy.sh`.
+
+**A tool's completions or init look stale.** Caches key off the binary's mtime,
+so an upgrade should regenerate them by itself. To force it:
+
+```bash
+dotfiles-doctor completions   # just the completion cache
+dotfiles-doctor clean         # everything, then: exec zsh
+```
+
+**`node` is the wrong version.** `common/lazy.sh` puts nvm's *default* alias on
+`PATH` at startup. Run `nvm use <version>` to change it for the session, or
+`nvm alias default <version>` to change it permanently.
+
+**`python3` is the wrong version.** pyenv's shims are deliberately **off**
+`PATH` — the default is whatever your package manager installed. Set
+`DOTFILES_PYENV_SHIMS=1` in `local.sh` to make pyenv authoritative.
+
+**"defining function based on alias" parse error.** Something is being sourced
+twice into a shell that already has the alias. Zsh parses an entire `if`/`else`
+block before running it, so this fires even on a branch that never executes.
+Call `_dot_undef <name>` as its own statement before the block — see the note
+in `common/env.sh`.
+
+**Warp lost its block UI or vi mode.** Something wrote to the terminal during
+startup and broke the handshake. See [macOS — Warp](#macos--warp) above.
+
+---
+
+## For AI Agents
+
+`claude/skills/kevin-shell-environment/` is a Claude Code skill that teaches
+agents which tools exist here, which commands are aliased and which deliberately
+aren't, and where the sharp edges are. `dotfiles-doctor link` symlinks it into
+`~/.claude/skills/`, so it applies in every repo rather than just this one.
+
+Agents also get:
+
+- **A faster shell.** `$CLAUDECODE` and friends set `DOTFILES_IS_AGENT=1`, which
+  skips the prompt, autosuggestions, syntax highlighting and the audited
+  `compinit`. Aliases, functions and `$PATH` are unchanged.
+- **`devinfo`** — the whole environment as one JSON blob, instead of a dozen
+  `command -v` probes.
+- **`ctx`** — cwd, repo, branch, dirty file count, recent commits.
+- **`noalias`** and **`rawshell`** — for when an alias is getting in the way.
 
 ---
 
 ## Updating
 
-Pull the latest changes and reload:
+```bash
+dotsync
+```
+
+Pulls the repo (`--rebase --autostash`), re-symlinks the tracked files into
+`$HOME`, backing up anything that is a real file rather than one of our
+symlinks, then `exec zsh`. Use `dotsync-cp` instead on Git Bash and MSYS2,
+where symlinks don't work.
+
+Because the files are symlinks, editing `~/.zshrc` edits the repo directly —
+changes are never silently lost. `dotpull` pulls without re-linking or
+restarting.
+
+After upgrading a tool whose init is cached (`zoxide`, `fzf`, `direnv`,
+`atuin`, `uv`), the cache regenerates automatically when the binary is newer.
+To force it:
 
 ```bash
-cd ~/.dotfiles && git pull && source ~/.zshrc   # or: source ~/.bashrc
+dotfiles-doctor clean && exec zsh
 ```
 
 ---
@@ -1072,14 +1501,18 @@ cd ~/.dotfiles && git pull && source ~/.zshrc   # or: source ~/.bashrc
 ## Uninstalling
 
 ```bash
-# Restore your backups
-[ -f ~/.zshrc.bak ]    && mv ~/.zshrc.bak    ~/.zshrc
-[ -f ~/.bashrc.bak ]   && mv ~/.bashrc.bak   ~/.bashrc
-[ -f ~/.p10k.zsh.bak ] && mv ~/.p10k.zsh.bak ~/.p10k.zsh
-[ -f ~/.vimrc.bak ]    && mv ~/.vimrc.bak    ~/.vimrc
-
-# Or just remove the symlinks
+# Remove the symlinks
 rm -f ~/.zshrc ~/.bashrc ~/.p10k.zsh ~/.vimrc
+
+# Restore whatever was there before. `dotfiles-doctor link` and `dotsync`
+# both back up to <name>.pre-dotfiles.<timestamp>; the manual install
+# instructions above use <name>.bak.
+ls -1 ~/.zshrc.pre-dotfiles.* ~/.zshrc.bak 2>/dev/null
+mv ~/.zshrc.pre-dotfiles.<timestamp> ~/.zshrc
+
+# Caches and the Claude Code skill link
+rm -rf ~/.cache/zsh ~/.cache/codeartifact-token
+rm -f  ~/.claude/skills/kevin-shell-environment
 
 # Remove the repo
 rm -rf ~/.dotfiles

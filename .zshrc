@@ -330,7 +330,7 @@ if (( ! DOTFILES_IS_AGENT )); then
     _dot_source "$_dot_plugdir/zsh-autosuggestions/zsh-autosuggestions.zsh"
     bindkey '^ ' autosuggest-accept  # Ctrl-Space accepts the suggestion.
 
-    # --- OMZ `aliases` plugin: `acs` prints a grouped alias cheatsheet
+    # --- OMZ `aliases` plugin: `als` prints a grouped alias cheatsheet
     _dot_source "$ZSH/plugins/aliases/aliases.plugin.zsh"
 fi
 
