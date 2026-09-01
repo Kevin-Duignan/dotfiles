@@ -537,6 +537,7 @@ fi
 # ============================================
 alias mdp='make dev-prompt'
 alias mdu='make dev-up'
+alias mdud='make dev-up-d'
 alias mdb='make dev-build'
 alias mdd='make dev-down'
 alias mga='make generate-apis'
