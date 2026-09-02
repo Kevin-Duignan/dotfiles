@@ -18,7 +18,8 @@
 # function of the same name, so unaliasing it here just deleted it outright.
 for _fn_stale in dotsync dotsync-cp dotsync_cp ports-kill ports_kill \
     gbclean gswhv jira extract ua mkcd take serve backup up proj \
-    vimi openi wfzf ffzf frg fbr fco fkill fzfdlog y batdiff; do
+    vimi openi wfzf ffzf frg fbr fco fkill fzfdlog y batdiff \
+    mkalias mcp-jira-login; do
     unalias "$_fn_stale" 2>/dev/null
 done
 unset _fn_stale
@@ -398,6 +399,88 @@ ports_kill() {
     unset _pk
 }
 alias ports-kill='ports_kill'
+
+# ============================================
+# mkalias — create, test and publish a new alias
+# ============================================
+# mkalias <name> <command...>
+#   1. Appends `alias <name>='<command>'` to common/aliases.sh, just above
+#      the "# <<< mkalias <<<" marker.
+#   2. Sources it into the current shell so you can try it right away.
+#   3. Asks whether it worked:
+#        yes -> commit, push, then dotsync (which pulls, relinks, and
+#               restarts the shell)
+#        no  -> removes the alias again, nothing committed
+mkalias() {
+    if [ -z "$1" ] || [ -z "$2" ]; then
+        echo "Usage: mkalias <name> <command...>"
+        echo "  e.g. mkalias gwip \"git add -A && git commit -m wip\""
+        return 1
+    fi
+
+    _ma_dir="${DOTFILES_DIR:-$HOME/.dotfiles}"
+    _ma_file="$_ma_dir/common/aliases.sh"
+    _ma_name="$1"; shift
+    _ma_cmd="$*"
+
+    if [ ! -f "$_ma_file" ]; then
+        echo "mkalias: $_ma_file not found." >&2
+        unset _ma_dir _ma_file _ma_name _ma_cmd
+        return 1
+    fi
+
+    if grep -q "^alias $_ma_name=" "$_ma_file"; then
+        echo "mkalias: '$_ma_name' is already defined in $_ma_file." >&2
+        unset _ma_dir _ma_file _ma_name _ma_cmd
+        return 1
+    fi
+
+    _ma_line="alias $_ma_name='$_ma_cmd'"
+
+    # `command` bypasses the interactive-safety `mv -i` / `rm -i` aliases
+    # (common/aliases.sh) — they'd otherwise eat the y/N answer below.
+    if ! awk -v line="$_ma_line" '
+        /^# <<< mkalias <<</ { print line }
+        { print }
+    ' "$_ma_file" > "$_ma_file.tmp"
+    then
+        echo "mkalias: failed to update $_ma_file." >&2
+        command rm -f "$_ma_file.tmp"
+        unset _ma_dir _ma_file _ma_name _ma_cmd _ma_line
+        return 1
+    fi
+    command mv "$_ma_file.tmp" "$_ma_file"
+
+    # shellcheck disable=SC1090
+    . "$_ma_file"
+
+    echo "Added: $_ma_line"
+    echo "Try '$_ma_name' now in this shell."
+    printf "Does it work as intended? [y/N] "
+    read -r _ma_ok
+
+    case "$_ma_ok" in
+        [Yy]*)
+            if ( cd "$_ma_dir" && git add common/aliases.sh \
+                    && git commit -m "Add $_ma_name alias" && git push )
+            then
+                dotsync
+            else
+                echo "mkalias: commit/push failed — alias kept locally, not synced." >&2
+            fi
+            ;;
+        *)
+            awk -v skip="$_ma_line" '$0 != skip' "$_ma_file" > "$_ma_file.tmp" \
+                && command mv "$_ma_file.tmp" "$_ma_file"
+            # Sourcing no longer defines it, but doesn't undefine an alias
+            # already active in this session — drop it explicitly too.
+            unalias "$_ma_name" 2>/dev/null
+            echo "Removed '$_ma_name' — nothing committed."
+            ;;
+    esac
+
+    unset _ma_dir _ma_file _ma_name _ma_cmd _ma_line _ma_ok
+}
 
 # ============================================
 # Dotfiles sync

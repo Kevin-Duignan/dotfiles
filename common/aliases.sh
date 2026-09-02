@@ -590,4 +590,12 @@ alias commitwell='zsh "${DOTFILES_DIR:-$HOME/.dotfiles}/common/commitwell.sh"'
 # mcp-jira-login is defined in common/functions.sh.
 alias mcpjira='mcp-jira-login'
 
+# ============================================
+# Custom aliases — added via mkalias() in common/functions.sh
+# ============================================
+# New aliases are inserted directly above the closing marker below.
+# Don't hand-edit between the markers; mkalias parses them.
+# >>> mkalias >>>
+# <<< mkalias <<<
+
 unset _dotfiles_is_msys
