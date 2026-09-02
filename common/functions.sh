@@ -162,6 +162,21 @@ _open_url() {
 }
 
 # ============================================
+# Claude Code — MCP servers
+# ============================================
+# mcp-jira-login — (re)authenticate the Jira MCP server for Claude Code.
+# Adds the server if it isn't configured yet, then runs the OAuth login.
+# `claude mcp login` opens a browser; there's no non-interactive way to
+# refresh the token, so this is a manual re-run when Jira MCP calls start
+# failing with an auth error, not something a hook can do for you.
+mcp-jira-login() {
+    _has_cmd claude || { echo "claude CLI is not installed."; return 1; }
+    claude mcp get jira >/dev/null 2>&1 \
+        || claude mcp add --transport http jira https://mcp.atlassian.com/v1/mcp/authv2
+    claude mcp login jira
+}
+
+# ============================================
 # fzf-powered helpers
 # ============================================
 

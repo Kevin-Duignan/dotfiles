@@ -584,4 +584,10 @@ fi
 # ============================================
 alias commitwell='zsh "${DOTFILES_DIR:-$HOME/.dotfiles}/common/commitwell.sh"'
 
+# ============================================
+# Claude Code — MCP servers
+# ============================================
+# mcp-jira-login is defined in common/functions.sh.
+alias mcpjira='mcp-jira-login'
+
 unset _dotfiles_is_msys
