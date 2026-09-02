@@ -50,19 +50,35 @@ export KEYTIMEOUT=1
 __GIT_BRANCH=""
 __GIT_DIRTY=""
 __GIT_LAST_DIR=""
+__GIT_LAST_HEAD_MTIME=""
 
 __git_update_cache() {
-  # Only recompute when directory changes
-  [[ "$PWD" == "$__GIT_LAST_DIR" ]] && return
-  __GIT_LAST_DIR="$PWD"
+  local git_dir head_mtime
 
-  if git rev-parse --is-inside-work-tree &>/dev/null; then
-    __GIT_BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null)"
-    git diff --quiet 2>/dev/null || __GIT_DIRTY="*"
-  else
+  git_dir="$(git rev-parse --git-dir 2>/dev/null)"
+
+  if [[ -z "$git_dir" ]]; then
+    __GIT_LAST_DIR="$PWD"
+    __GIT_LAST_HEAD_MTIME=""
     __GIT_BRANCH=""
     __GIT_DIRTY=""
+    return
   fi
+
+  # .git/HEAD's mtime changes on checkout/switch/commit, so recompute
+  # whenever the directory OR HEAD has changed, not just the directory.
+  head_mtime="$(stat -f %m "$git_dir/HEAD" 2>/dev/null || stat -c %Y "$git_dir/HEAD" 2>/dev/null)"
+
+  if [[ "$PWD" == "$__GIT_LAST_DIR" && "$head_mtime" == "$__GIT_LAST_HEAD_MTIME" ]]; then
+    return
+  fi
+
+  __GIT_LAST_DIR="$PWD"
+  __GIT_LAST_HEAD_MTIME="$head_mtime"
+  __GIT_DIRTY=""
+
+  __GIT_BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null)"
+  git diff --quiet 2>/dev/null || __GIT_DIRTY="*"
 }
 
 # =========
