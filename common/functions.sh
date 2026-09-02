@@ -406,15 +406,15 @@ alias ports-kill='ports_kill'
 # mkalias <name> <command...>
 #   1. Appends `alias <name>='<command>'` to common/aliases.sh, just above
 #      the "# <<< mkalias <<<" marker.
-#   2. Sources it into the current shell so you can try it right away.
-#   3. Asks whether it worked:
-#        yes -> commit, push, then dotsync (which pulls, relinks, and
-#               restarts the shell)
-#        no  -> removes the alias again, nothing committed
+#   2. Verifies the alias loads in a fresh shell before proceeding.
+#   3. Asks whether it worked, then requires explicit confirmation before
+#      staging, committing, pushing and syncing the repo.
+#   4. If it fails verification or the user declines, the alias is removed
+#      again and nothing is written to git.
 mkalias() {
     if [ -z "$1" ] || [ -z "$2" ]; then
         echo "Usage: mkalias <name> <command...>"
-        echo "  e.g. mkalias gwip \"git add -A && git commit -m wip\""
+        echo '  e.g. mkalias gwip "git add -A && git commit -m wip"'
         return 1
     fi
 
@@ -429,6 +429,14 @@ mkalias() {
         return 1
     fi
 
+    case "$_ma_name" in
+        ''|*[!A-Za-z0-9_.-]*)
+            echo "mkalias: alias names may only contain letters, digits, _, . and -." >&2
+            unset _ma_dir _ma_file _ma_name _ma_cmd
+            return 1
+            ;;
+    esac
+
     if grep -q "^alias $_ma_name=" "$_ma_file"; then
         echo "mkalias: '$_ma_name' is already defined in $_ma_file." >&2
         unset _ma_dir _ma_file _ma_name _ma_cmd
@@ -436,20 +444,30 @@ mkalias() {
     fi
 
     _ma_line="alias $_ma_name='$_ma_cmd'"
+    _ma_tmp="$_ma_file.tmp"
 
     # `command` bypasses the interactive-safety `mv -i` / `rm -i` aliases
     # (common/aliases.sh) — they'd otherwise eat the y/N answer below.
     if ! awk -v line="$_ma_line" '
         /^# <<< mkalias <<</ { print line }
         { print }
-    ' "$_ma_file" > "$_ma_file.tmp"
+    ' "$_ma_file" > "$_ma_tmp"
     then
         echo "mkalias: failed to update $_ma_file." >&2
-        command rm -f "$_ma_file.tmp"
-        unset _ma_dir _ma_file _ma_name _ma_cmd _ma_line
+        command rm -f "$_ma_tmp"
+        unset _ma_dir _ma_file _ma_name _ma_cmd _ma_line _ma_tmp
         return 1
     fi
-    command mv "$_ma_file.tmp" "$_ma_file"
+
+    # Verify in a fresh shell before we touch git.
+    if ! zsh -c '. "$1" >/dev/null 2>&1; alias "$2" >/dev/null 2>&1' zsh "$_ma_tmp" "$_ma_name"; then
+        echo "mkalias: verification failed — alias did not load in a fresh shell." >&2
+        command rm -f "$_ma_tmp"
+        unset _ma_dir _ma_file _ma_name _ma_cmd _ma_line _ma_tmp
+        return 1
+    fi
+
+    command mv "$_ma_tmp" "$_ma_file"
 
     # shellcheck disable=SC1090
     . "$_ma_file"
@@ -461,25 +479,32 @@ mkalias() {
 
     case "$_ma_ok" in
         [Yy]*)
-            if ( cd "$_ma_dir" && git add common/aliases.sh \
-                    && git commit -m "Add $_ma_name alias" && git push )
-            then
-                dotsync
-            else
-                echo "mkalias: commit/push failed — alias kept locally, not synced." >&2
-            fi
+            printf "Proceed with git add / commit / push / sync? [y/N] "
+            read -r _ma_commit
+            case "$_ma_commit" in
+                [Yy]*)
+                    if ( cd "$_ma_dir" && git add common/aliases.sh \
+                            && git commit -m "Add alias" && git push )
+                    then
+                        dotsync
+                    else
+                        echo "mkalias: commit/push failed — alias kept locally, not synced." >&2
+                    fi
+                    ;;
+                *)
+                    echo "mkalias: alias kept locally; nothing committed or synced."
+                    ;;
+            esac
             ;;
         *)
             awk -v skip="$_ma_line" '$0 != skip' "$_ma_file" > "$_ma_file.tmp" \
                 && command mv "$_ma_file.tmp" "$_ma_file"
-            # Sourcing no longer defines it, but doesn't undefine an alias
-            # already active in this session — drop it explicitly too.
             unalias "$_ma_name" 2>/dev/null
             echo "Removed '$_ma_name' — nothing committed."
             ;;
     esac
 
-    unset _ma_dir _ma_file _ma_name _ma_cmd _ma_line _ma_ok
+    unset _ma_dir _ma_file _ma_name _ma_cmd _ma_line _ma_ok _ma_commit
 }
 
 # ============================================
