@@ -404,16 +404,13 @@ alias ports-kill='ports_kill'
 # mkalias — create, test and publish a new alias
 # ============================================
 # mkalias <name> <command...>
-#   1. Asks which header to file the alias under — an existing one inside
-#      the managed block, or a new one — then inserts
-#      `alias <name>='<command>'` grouped under a "# -- Header --" line
-#      in common/aliases.sh.
+#   1. Appends `alias <name>='<command>'` to common/aliases.sh, just above
+#      the "# <<< mkalias <<<" marker.
 #   2. Verifies the alias loads in a fresh shell before proceeding.
 #   3. Sources it into the current shell and asks whether it worked:
 #        yes -> commit, push, then dotsync (which pulls, relinks, and
 #               restarts the shell)
-#        no  -> removes the alias again (and the header, if it was new),
-#               nothing committed
+#        no  -> removes the alias again, nothing committed
 #   4. If it fails verification, the alias is removed again and nothing
 #      is written to git.
 mkalias() {
@@ -448,117 +445,19 @@ mkalias() {
         return 1
     fi
 
-    # Headers already used inside the mkalias-managed block, one per line.
-    _ma_headers=$(awk '
-        /^# >>> mkalias >>>/ { f = 1; next }
-        /^# <<< mkalias <<</ { f = 0 }
-        f && /^# -- .+ --$/ {
-            h = $0
-            sub(/^# -- /, "", h)
-            sub(/ --$/, "", h)
-            print h
-        }
-    ' "$_ma_file")
-
-    _ma_oldifs=$IFS
-    IFS='
-'
-    set -- $_ma_headers
-    IFS=$_ma_oldifs
-
-    if [ -n "$_ma_headers" ]; then
-        echo "Existing headers:"
-        _ma_i=0
-        for _ma_h in "$@"; do
-            _ma_i=$((_ma_i + 1))
-            echo "  $_ma_i) $_ma_h"
-        done
-    fi
-
-    printf "Header for '%s' (number above, or a new name): " "$_ma_name"
-    read -r _ma_header_in
-
-    case "$_ma_header_in" in
-        ''|*[!0-9]*)
-            _ma_header="$_ma_header_in"
-            ;;
-        *)
-            _ma_header=""
-            _ma_j=0
-            for _ma_h in "$@"; do
-                _ma_j=$((_ma_j + 1))
-                [ "$_ma_j" = "$_ma_header_in" ] && _ma_header="$_ma_h"
-            done
-            [ -z "$_ma_header" ] && _ma_header="$_ma_header_in"
-            ;;
-    esac
-
-    case "$_ma_header" in
-        '')
-            echo "mkalias: header cannot be empty." >&2
-            unset _ma_dir _ma_file _ma_name _ma_cmd _ma_headers _ma_header _ma_header_in
-            return 1
-            ;;
-        *--*)
-            echo "mkalias: header name cannot contain '--'." >&2
-            unset _ma_dir _ma_file _ma_name _ma_cmd _ma_headers _ma_header _ma_header_in
-            return 1
-            ;;
-    esac
-
-    _ma_new_header=1
-    for _ma_h in "$@"; do
-        [ "$_ma_h" = "$_ma_header" ] && _ma_new_header=0
-    done
-
     _ma_line="alias $_ma_name='$_ma_cmd'"
     _ma_tmp="$_ma_file.tmp"
 
-    # Groups the new alias under its header: appended after the last alias
-    # already under that header, or (for a brand-new header) as a new
-    # "# -- Header --" group just above the closing marker.
-    if ! awk -v header="$_ma_header" -v newline="$_ma_line" '
-        { buf[NR] = $0 }
-        END {
-            n = NR
-            in_block = 0
-            cur_header = ""
-            last_line = 0
-            header_line = 0
-            found_header = 0
-            block_end = 0
-            for (i = 1; i <= n; i++) {
-                l = buf[i]
-                if (l == "# >>> mkalias >>>") { in_block = 1; continue }
-                if (l == "# <<< mkalias <<<") { block_end = i; in_block = 0; continue }
-                if (!in_block) continue
-                if (l ~ /^# -- .+ --$/) {
-                    h = l
-                    sub(/^# -- /, "", h)
-                    sub(/ --$/, "", h)
-                    cur_header = h
-                    if (cur_header == header) { found_header = 1; header_line = i }
-                    continue
-                }
-                if (l ~ /^alias [A-Za-z0-9_.-]+=/ && cur_header == header) {
-                    last_line = i
-                }
-            }
-            insert_after = (last_line > 0) ? last_line : header_line
-            for (i = 1; i <= n; i++) {
-                print buf[i]
-                if (found_header && i == insert_after) print newline
-                if (!found_header && i == block_end - 1) {
-                    print "# -- " header " --"
-                    print newline
-                }
-            }
-        }
+    # `command` bypasses the interactive-safety `mv -i` / `rm -i` aliases
+    # (common/aliases.sh) — they'd otherwise eat the y/N answer below.
+    if ! awk -v line="$_ma_line" '
+        /^# <<< mkalias <<</ { print line }
+        { print }
     ' "$_ma_file" > "$_ma_tmp"
     then
         echo "mkalias: failed to update $_ma_file." >&2
         command rm -f "$_ma_tmp"
-        unset _ma_dir _ma_file _ma_name _ma_cmd _ma_line _ma_tmp _ma_headers _ma_header _ma_header_in _ma_new_header
+        unset _ma_dir _ma_file _ma_name _ma_cmd _ma_line _ma_tmp
         return 1
     fi
 
@@ -566,18 +465,16 @@ mkalias() {
     if ! zsh -c '. "$1" >/dev/null 2>&1; alias "$2" >/dev/null 2>&1' zsh "$_ma_tmp" "$_ma_name"; then
         echo "mkalias: verification failed — alias did not load in a fresh shell." >&2
         command rm -f "$_ma_tmp"
-        unset _ma_dir _ma_file _ma_name _ma_cmd _ma_line _ma_tmp _ma_headers _ma_header _ma_header_in _ma_new_header
+        unset _ma_dir _ma_file _ma_name _ma_cmd _ma_line _ma_tmp
         return 1
     fi
 
-    # `command` bypasses the interactive-safety `mv -i` alias (common/aliases.sh)
-    # — it'd otherwise eat the y/N answer below.
     command mv "$_ma_tmp" "$_ma_file"
 
     # shellcheck disable=SC1090
     . "$_ma_file"
 
-    echo "Added: $_ma_line (under '$_ma_header')"
+    echo "Added: $_ma_line"
     echo "Try '$_ma_name' now in this shell."
     printf "Does it work as intended? [y/N] "
     read -r _ma_ok
@@ -595,25 +492,20 @@ mkalias() {
         *)
             awk -v skip="$_ma_line" '$0 != skip' "$_ma_file" > "$_ma_file.tmp" \
                 && command mv "$_ma_file.tmp" "$_ma_file"
-            if [ "$_ma_new_header" = 1 ]; then
-                awk -v skip="# -- $_ma_header --" '$0 != skip' "$_ma_file" > "$_ma_file.tmp" \
-                    && command mv "$_ma_file.tmp" "$_ma_file"
-            fi
             unalias "$_ma_name" 2>/dev/null
             echo "Removed '$_ma_name' — nothing committed."
             ;;
     esac
 
-    unset _ma_dir _ma_file _ma_name _ma_cmd _ma_line _ma_ok _ma_headers _ma_header _ma_header_in _ma_new_header _ma_i _ma_j _ma_h _ma_oldifs
+    unset _ma_dir _ma_file _ma_name _ma_cmd _ma_line _ma_ok
 }
 
 # ============================================
 # als — list every alias, grouped by section
 # ============================================
 # Parses common/aliases.sh for its "# === Header ===" section dividers
-# and the "# -- Header --" sub-headers mkalias creates inside its managed
-# block, and prints every `alias name=...` grouped under whichever
-# header it lives under.
+# and prints every `alias name=...` grouped under whichever header it
+# lives under.
 als() {
     _als_file="${DOTFILES_DIR:-$HOME/.dotfiles}/common/aliases.sh"
 
@@ -636,13 +528,6 @@ als() {
                 else { state = 0 }
             }
             if (state == 0 && $0 ~ /^# =+$/) { state = 1; next }
-            if ($0 ~ /^# -- .+ --$/) {
-                h = $0
-                sub(/^# -- /, "", h)
-                sub(/ --$/, "", h)
-                header = h
-                next
-            }
             if ($0 !~ /^[[:space:]]*#/ && match($0, /alias [A-Za-z0-9_.-]+=/)) {
                 seg = substr($0, RSTART, RLENGTH)
                 name = seg

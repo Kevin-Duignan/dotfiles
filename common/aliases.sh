@@ -593,10 +593,8 @@ alias mcpjira='mcp-jira-login'
 # ============================================
 # Custom aliases — added via mkalias() in common/functions.sh
 # ============================================
-# mkalias groups each alias under a "# -- Header --" line you choose
-# (existing or new) when you create it. `als` lists everything grouped
-# by these headers, plus every other section above. Don't hand-edit
-# between the markers below; mkalias and als both parse them.
+# New aliases are inserted directly above the closing marker below.
+# Don't hand-edit between the markers; mkalias and als both parse them.
 # >>> mkalias >>>
 alias uvrdoc='uv run run.py document'
 # <<< mkalias <<<
