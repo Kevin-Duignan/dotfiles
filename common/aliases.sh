@@ -145,16 +145,16 @@ fi
 # ============================================
 # -pp = --plain --plain: no line numbers, no grid, no paging.
 # Output is byte-identical to cat for piping purposes.
-_dot_undef cat        # defined as a function on the MSYS branch below
-if _has_cmd bat; then
-    if [ "$_dotfiles_is_msys" = 1 ] && _has_cmd cygpath; then
-        cat() { _win_wrap bat -pp "$@"; }
-    else
-        alias cat='bat -pp'
-    fi
-    alias batp='bat'                          # the pretty, paged version
-    alias bathelp='bat --plain --language=help'
-fi
+# _dot_undef cat        # defined as a function on the MSYS branch below
+# if _has_cmd bat; then
+#     if [ "$_dotfiles_is_msys" = 1 ] && _has_cmd cygpath; then
+#         cat() { _win_wrap bat -pp "$@"; }
+#     else
+#         alias cat='bat -pp'
+#     fi
+#     alias batp='bat'                          # the pretty, paged version
+#     alias bathelp='bat --plain --language=help'
+# fi
 
 # ============================================
 # Directory navigation
