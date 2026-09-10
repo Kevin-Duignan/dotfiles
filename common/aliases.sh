@@ -597,6 +597,7 @@ alias mcpjira='mcp-jira-login'
 # Don't hand-edit between the markers; mkalias and als both parse them.
 # >>> mkalias >>>
 alias uvrdoc='uv run run.py document'
+alias uvrh='uv run run.py hydrosection'
 # <<< mkalias <<<
 
 unset _dotfiles_is_msys
