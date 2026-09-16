@@ -598,6 +598,7 @@ alias mcpjira='mcp-jira-login'
 # >>> mkalias >>>
 alias uvrdoc='uv run run.py document'
 alias uvrh='uv run run.py hydrosection'
+alias uvrde='uv run run.py deliverable_run'
 # <<< mkalias <<<
 
 unset _dotfiles_is_msys
