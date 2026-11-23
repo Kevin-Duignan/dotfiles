@@ -144,7 +144,8 @@ Kevin uses OMZ-style git aliases, defined in `common/aliases.sh`. Common ones:
 
 Helper functions available: `git_main_branch`, `git_current_branch`,
 `git_develop_branch`, `gbclean` (prune branches whose remote is gone),
-`gswhv <ticket>` (create/switch to a `$JIRA_PREFIX-<n>` branch).
+`gswhv <ticket>` (create/switch to a `$JIRA_PREFIX-<n>` branch),
+`gwcd <branch>` (cd into that branch's worktree).
 
 Jira config (`$JIRA_URL`, `$JIRA_PREFIX`) lives in `local.sh`, which is
 gitignored — this repo is public, so no org-specific values are committed.

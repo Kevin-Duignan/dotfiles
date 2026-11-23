@@ -1195,6 +1195,7 @@ Inlined from the Oh My Zsh git plugin — the plugin itself is never loaded.
 | `gcp` / `gcpa` / `gcpc` | cherry-pick / `--abort` / `--continue` |
 | `gwt` / `gwta` / `gwtl` / `gwtrm` | `git worktree` add / list / remove |
 | `grt` | `cd` to the repo root |
+| `gwcd <branch>` | `cd` into the worktree that has `<branch>` checked out |
 | `gclean` / `gbclean` | interactive clean / delete branches whose remote is gone |
 | `batdiff` | `bat --diff` over every changed file |
 | `commitwell` | Interactive commit wizard (`common/commitwell.sh`) |

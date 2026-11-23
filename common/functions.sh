@@ -17,7 +17,7 @@
 # in this list by mistake — it is a live alias from common/aliases.sh with no
 # function of the same name, so unaliasing it here just deleted it outright.
 for _fn_stale in dotsync dotsync-cp dotsync_cp ports-kill ports_kill \
-    gbclean gswhv jira extract ua mkcd take serve backup up proj \
+    gbclean gwcd gswhv jira extract ua mkcd take serve backup up proj \
     vimi openi wfzf ffzf frg fbr fco fkill fzfdlog y batdiff \
     mkalias mcp-jira-login als; do
     unalias "$_fn_stale" 2>/dev/null
@@ -108,6 +108,18 @@ gswhv() {
 gbclean() {
     git fetch --prune
     git branch -vv | awk '/: gone]/{print $1}' | xargs -r git branch -D
+}
+
+# gwcd <branch> — cd into the worktree that has <branch> checked out.
+# index() is a literal match; `~ "[branch]"` would be a regex character class.
+gwcd() {
+    local dir
+    dir=$(git worktree list | awk -v branch="[$1]" 'index($0, branch) {print $1; exit}')
+    if [ -n "$dir" ]; then
+        cd "$dir" || return
+    else
+        echo "No worktree found for branch: $1"
+    fi
 }
 
 # ============================================
